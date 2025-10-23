@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crushed Toolkit</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar">
+        <div class="brand">Crushed Toolkit</div>
+        <nav class="nav">
+          <section class="category open" data-category="audio">
+            <button class="cat-header" type="button">
+              <span class="cat-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 5L6 9H3v6h3l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 10v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <span class="cat-title">Audio</span>
+              <span class="chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
+            <div class="cat-content">
+              <button class="nav-item active" data-module="youtube">Descargador YouTube</button>
+              <button class="nav-item" data-module="analyzer">Analizador BPM/Tonalidad</button>
+              <button class="nav-item" data-module="mixedkey">Compatibles (Camelot)</button>
+            </div>
+          </section>
+
+          <section class="category" data-category="minecraft">
+            <button class="cat-header" type="button">
+              <span class="cat-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12l8-8 8 8-8 8-8-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="cat-title">Minecraft</span>
+              <span class="chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
+            <div class="cat-content">
+              <button class="nav-item" data-module="mc_startbat">Generador start.bat (Aikar Flags)</button>
+            </div>
+          </section>
+
+          <section class="category" data-category="utils">
+            <button class="cat-header" type="button">
+              <span class="cat-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l4 4-8 8-4-4 8-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="cat-title">Utilidades</span>
+              <span class="chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
+            <div class="cat-content">
+              <button class="nav-item" data-module="converter">Conversor/Optimizador de Imágenes</button>
+            </div>
+          </section>
+
+          <div class="spacer"></div>
+          <section class="category open" data-category="info">
+            <div class="cat-content">
+              <button class="nav-item" data-module="about">Acerca de</button>
+            </div>
+          </section>
+        </nav>
+      </aside>
+      <main class="content">
+        <header class="topbar">
+          <h1 id="module-title">Descargador YouTube</h1>
+        </header>
+        <section id="module-container"></section>
+      </main>
+    </div>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

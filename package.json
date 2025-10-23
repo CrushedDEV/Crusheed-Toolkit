@@ -1,0 +1,56 @@
+{
+  "name": "crushed-toolkit",
+  "version": "0.1.1",
+  "description": "Crushed Toolkit - Electron desktop app with modular tools (YouTube downloader module included)",
+  "main": "backend/main.js",
+  "type": "module",
+  "author": "CrushedDEV",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CrushedDEV/crusheed-toolkit.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "node backend/postinstall.js",
+    "dist": "electron-builder",
+    "publish": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "node-id3": "^0.2.6",
+    "pitchfinder": "^2.3.2",
+    "jszip": "^3.10.1",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.crushed.toolkit",
+    "productName": "Crushed Toolkit",
+    "files": [
+      "backend/**",
+      "renderer/**",
+      "modules/**",
+      "assets/**",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ]
+  }
+}
