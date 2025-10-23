@@ -1,6 +1,6 @@
 {
   "name": "crushed-toolkit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Crushed Toolkit - Electron desktop app with modular tools (YouTube downloader module included)",
   "main": "backend/main.js",
   "type": "module",
