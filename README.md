@@ -51,6 +51,3 @@ Los usuarios verán un banner en la app cuando exista una nueva versión, con bo
   - Imágenes: ajusta formato, calidad y tamaño; convierte en lote (ZIP) o previsualiza.
   - DOCX: usa “DOCX → HTML (vista)” o “DOCX → PDF”.
 
-## Licencia
-
-MIT
