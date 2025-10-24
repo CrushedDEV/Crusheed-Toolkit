@@ -15,7 +15,8 @@ const isDev = !app.isPackaged;
 let mainWindow = null;
 
 function getPreloadPath() {
-  return path.join(process.cwd(), 'backend', 'preload.cjs');
+  const base = app.isPackaged ? app.getAppPath() : process.cwd();
+  return path.join(base, 'backend', 'preload.cjs');
 }
 
 async function createWindow() {
