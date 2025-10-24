@@ -57,12 +57,51 @@ export function mountYouTubeModule(root) {
     }
   });
 
-  const off = window.ctk.youtube.onProgress(({ percent }) => {
+  // Fallback: inspect raw yt-dlp lines to extract percent if main parsing fails
+  const offLog = window.ctk.youtube.onLog(({ stream, line }) => {
+    try { console.debug('yt-dlp:', stream, line); } catch {}
+    if (typeof line === 'string') {
+      const m = line.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/) || line.match(/((?:\d+[\.,]\d+)|\d+)%/);
+      if (m) {
+        const p = parseFloat(String(m[1]).replace(',', '.'));
+        if (!Number.isNaN(p)) {
+          lastPercent = Math.max(0, Math.min(100, p));
+          bar.style.width = lastPercent + '%';
+          const txt = `${lastPercent.toFixed(1)}%`;
+          status.textContent = `Descargando: ${txt}`;
+          if (percentBadge) percentBadge.textContent = txt;
+        }
+      }
+      if (/\[ExtractAudio\]/.test(line)) status.textContent = 'Extrayendo audio…';
+      if (/\[Merger\]/.test(line)) status.textContent = 'Combinando audio y video…';
+    }
+  });
+
+  let lastPercent = 0;
+  function setBusy(b){
+    const disabled = !!b;
+    urlInput.disabled = disabled;
+    fmtSelect.disabled = disabled;
+    outInput.disabled = disabled;
+    btnBrowse.disabled = disabled;
+    btnDownload.disabled = disabled;
+    btnDownload.textContent = disabled ? 'Descargando…' : 'Descargar';
+  }
+
+  const off = window.ctk.youtube.onProgress(({ percent, stage, step }) => {
     if (typeof percent === 'number') {
-      bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
-      const txt = `${percent.toFixed(1)}%`;
+      lastPercent = Math.max(0, Math.min(100, percent));
+      bar.style.width = lastPercent + '%';
+      const txt = `${lastPercent.toFixed(1)}%`;
       status.textContent = `Descargando: ${txt}`;
       if (percentBadge) percentBadge.textContent = txt;
+      return;
+    }
+    // If no percent, show stage information
+    if (stage === 'postprocess') {
+      bar.style.width = '100%';
+      const human = step === 'extract-audio' ? 'Extrayendo audio…' : (step === 'merge' ? 'Combinando audio y video…' : 'Procesando…');
+      status.textContent = human;
     }
   });
 
@@ -82,33 +121,42 @@ export function mountYouTubeModule(root) {
     }
     status.textContent = 'Iniciando descarga…';
     bar.style.width = '0%';
+    lastPercent = 0;
+    if (percentBadge) percentBadge.textContent = '0%';
+    setBusy(true);
 
-    const res = await window.ctk.youtube.download({ url, format, outputDir });
-    if (res.ok) {
-      status.innerHTML = `<span class="success">Completado</span>`;
-      if (res.file) {
-        const openBtn = document.createElement('button');
-        openBtn.className = 'ghost';
-        openBtn.style.marginLeft = '8px';
-        openBtn.textContent = 'Mostrar en carpeta';
-        openBtn.onclick = () => window.ctk.shell.showItemInFolder(res.file);
-        status.appendChild(openBtn);
-
-        // If MP3, allow direct analyze navigation
-        if (String(res.file).toLowerCase().endsWith('.mp3')) {
-          const analyzeBtn = document.createElement('button');
-          analyzeBtn.className = 'ghost';
-          analyzeBtn.style.marginLeft = '8px';
-          analyzeBtn.textContent = 'Analizar BPM/Tonalidad';
-          analyzeBtn.onclick = () => {
-            const ev = new CustomEvent('ctk:navigate', { detail: { module: 'analyzer', params: { filePath: res.file } } });
-            window.dispatchEvent(ev);
+    try {
+      const res = await window.ctk.youtube.download({ url, format, outputDir });
+      if (res.ok) {
+        status.innerHTML = `<span class="success">Completado</span>`;
+        if (res.file) {
+          const openBtn = document.createElement('button');
+          openBtn.className = 'ghost';
+          openBtn.style.marginLeft = '8px';
+          openBtn.textContent = 'Mostrar en carpeta';
+          openBtn.onclick = async () => {
+            try { await window.ctk.shell.showItemInFolder(res.file); } catch {}
           };
-          status.appendChild(analyzeBtn);
+          status.appendChild(openBtn);
+
+          // If MP3, allow direct analyze navigation
+          if (String(res.file).toLowerCase().endsWith('.mp3')) {
+            const analyzeBtn = document.createElement('button');
+            analyzeBtn.className = 'ghost';
+            analyzeBtn.style.marginLeft = '8px';
+            analyzeBtn.textContent = 'Analizar BPM/Tonalidad';
+            analyzeBtn.onclick = () => {
+              const ev = new CustomEvent('ctk:navigate', { detail: { module: 'analyzer', params: { filePath: res.file } } });
+              window.dispatchEvent(ev);
+            };
+            status.appendChild(analyzeBtn);
+          }
         }
+      } else {
+        status.innerHTML = `<span class="warn">Error: ${res.error}</span>`;
       }
-    } else {
-      status.innerHTML = `<span class="warn">Error: ${res.error}</span>`;
+    } finally {
+      setBusy(false);
     }
   });
 

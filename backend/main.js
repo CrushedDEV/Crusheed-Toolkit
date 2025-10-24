@@ -190,6 +190,11 @@ ipcMain.handle('youtube:download', async (_evt, payload) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('youtube:progress', p);
         }
+      },
+      onLog: (entry) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('youtube:log', entry);
+        }
       }
     });
     return { ok: true, file: result.outputFile };
@@ -199,7 +204,28 @@ ipcMain.handle('youtube:download', async (_evt, payload) => {
 });
 
 ipcMain.handle('shell:showItemInFolder', async (_evt, filePath) => {
-  if (filePath) shell.showItemInFolder(filePath);
+  try {
+    if (!filePath) return { ok:false, error:'Ruta vacía' };
+    let p = filePath;
+    // Handle file:// URLs
+    if (String(p).startsWith('file://')) {
+      try { p = url.fileURLToPath(p); } catch {}
+    }
+    // Normalize separators for Windows
+    p = path.normalize(p);
+    try {
+      await fs.access(p);
+      shell.showItemInFolder(p);
+      return { ok:true };
+    } catch {
+      // If file not found, try opening its directory
+      const dir = path.dirname(p);
+      try { await fs.access(dir); shell.openPath(dir); return { ok:true, openedDir: dir }; } catch {}
+      return { ok:false, error:'Archivo no encontrado' };
+    }
+  } catch (err) {
+    return { ok:false, error: err?.message || String(err) };
+  }
 });
 
 ipcMain.handle('audio:analyze', async (_evt, filePath) => {

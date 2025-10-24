@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld('ctk', {
       const listener = (_e, data) => cb(data);
       ipcRenderer.on('youtube:progress', listener);
       return () => ipcRenderer.removeListener('youtube:progress', listener);
+    },
+    onLog: (cb) => {
+      const listener = (_e, data) => cb && cb(data);
+      ipcRenderer.on('youtube:log', listener);
+      return () => ipcRenderer.removeListener('youtube:log', listener);
     }
   },
   desktop: {

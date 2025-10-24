@@ -73,7 +73,7 @@ export async function checkFfmpegAvailable() {
   return Boolean(ff);
 }
 
-export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgress }) {
+export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgress, onLog }) {
   return new Promise((resolve, reject) => {
     const outTemplate = path.join(outputDir, '%(title)s.%(ext)s');
 
@@ -83,6 +83,8 @@ export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgres
       '--no-playlist',
       '--newline',
       '--no-color',
+      '--progress',
+      '--progress-template', '[download] %(progress._percent_str)s',
       '--print', 'after_move:%(filepath)s'
     ];
 
@@ -99,9 +101,10 @@ export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgres
 
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString();
-      const lines = text.split(/\r?\n/);
+      const lines = text.replace(/\r/g, '\n').split(/\n/);
       for (const line of lines) {
         if (!line) continue;
+        if (onLog) onLog({ stream: 'stdout', line });
         // Capture explicit printed final path
         // If yt-dlp printed the final filepath, prefer it
         if (!lastOutputFile) {
@@ -112,10 +115,19 @@ export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgres
           }
         }
         // Progress lines like: [download]  12.3% ...
-        const m = line.match(/\[download\]\s+(\d+\.\d+|\d+)%/);
+        let m = line.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/);
+        if (!m) m = line.match(/((?:\d+[\.,]\d+)|\d+)%/);
         if (m && onProgress) {
-          const percent = parseFloat(m[1]);
-          onProgress({ percent });
+          const percent = parseFloat(String(m[1]).replace(',', '.'));
+          // Try to capture speed and ETA from the same line
+          const speedMatch = line.match(/\bat\s+([\d\.]+\w+\/s)\b/i);
+          const etaMatch = line.match(/ETA\s+([0-9:]+)/i);
+          onProgress({ percent, stage: 'download', speed: speedMatch ? speedMatch[1] : undefined, eta: etaMatch ? etaMatch[1] : undefined });
+        }
+        // Post-processing cues
+        if (onProgress) {
+          if (/\[ExtractAudio\]/.test(line)) onProgress({ stage: 'postprocess', step: 'extract-audio' });
+          if (/\[Merger\]/.test(line)) onProgress({ stage: 'postprocess', step: 'merge' });
         }
         // Fallback parsing for output path lines
         if (!lastOutputFile) {
@@ -130,10 +142,19 @@ export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgres
     let errBuf = '';
     child.stderr.on('data', (chunk) => {
       errBuf += chunk.toString();
-      const text = chunk.toString();
-      const m = text.match(/\[download\]\s+(\d+\.\d+|\d+)%/);
+      const text = chunk.toString().replace(/\r/g, '\n');
+      text.split(/\n/).forEach(l => { if (l && onLog) onLog({ stream: 'stderr', line: l }); });
+      let m = text.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/);
+      if (!m) m = text.match(/((?:\d+[\.,]\d+)|\d+)%/);
       if (m && onProgress) {
-        onProgress({ percent: parseFloat(m[1]) });
+        const percent = parseFloat(String(m[1]).replace(',', '.'));
+        const speedMatch = text.match(/\bat\s+([\d\.]+\w+\/s)\b/i);
+        const etaMatch = text.match(/ETA\s+([0-9:]+)/i);
+        onProgress({ percent, stage: 'download', speed: speedMatch ? speedMatch[1] : undefined, eta: etaMatch ? etaMatch[1] : undefined });
+      }
+      if (onProgress) {
+        if (/\[ExtractAudio\]/.test(text)) onProgress({ stage: 'postprocess', step: 'extract-audio' });
+        if (/\[Merger\]/.test(text)) onProgress({ stage: 'postprocess', step: 'merge' });
       }
     });
 
