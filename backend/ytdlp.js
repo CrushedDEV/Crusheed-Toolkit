@@ -5,7 +5,7 @@ import { existsSync, createWriteStream } from 'node:fs';
 import { spawn } from 'node:child_process';
 import https from 'node:https';
 
-const BIN_DIR = path.join(process.cwd(), 'assets', 'bin');
+const BIN_DIR = path.join(os.homedir(), '.crushed-toolkit', 'bin');
 const YT_WIN_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
 const YT_NIX_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
 

@@ -78,6 +78,7 @@ export function mountYouTubeModule(root) {
   });
 
   let lastPercent = 0;
+  let busy = false;
   function setBusy(b){
     const disabled = !!b;
     urlInput.disabled = disabled;
@@ -119,11 +120,13 @@ export function mountYouTubeModule(root) {
       status.textContent = 'Ingrese una URL válida.';
       return;
     }
+    if (busy) return;
     status.textContent = 'Iniciando descarga…';
     bar.style.width = '0%';
     lastPercent = 0;
     if (percentBadge) percentBadge.textContent = '0%';
     setBusy(true);
+    busy = true;
 
     try {
       const res = await window.ctk.youtube.download({ url, format, outputDir });
@@ -157,9 +160,10 @@ export function mountYouTubeModule(root) {
       }
     } finally {
       setBusy(false);
+      busy = false;
     }
   });
 
-  // cleanup when module is switched (optional in this simple setup)
-  root._cleanup = () => off && off();
+  // cleanup when module is switched
+  root._cleanup = () => { try { off && off(); } catch {} try { offLog && offLog(); } catch {} };
 }

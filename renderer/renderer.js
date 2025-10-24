@@ -1,7 +1,7 @@
 import { modules } from '../modules/index.js';
 
 const container = document.getElementById('module-container');
-const title = document.getElementById('module-title');
+let title = document.getElementById('module-title');
 const navButtons = Array.from(document.querySelectorAll('.nav-item'));
 const categories = Array.from(document.querySelectorAll('.category'));
 const catHeaders = Array.from(document.querySelectorAll('.cat-header'));
@@ -82,9 +82,14 @@ function loadOpenCategories() {
   return null;
 }
 
+let currentCleanup = null;
+
 function switchModule(key, params) {
   const mod = modules[key];
   if (!mod) return;
+  // call previous cleanup to remove listeners, timers, etc.
+  try { if (typeof currentCleanup === 'function') currentCleanup(); } catch {}
+  currentCleanup = null;
   navButtons.forEach(b => b.classList.toggle('active', b.dataset.module === key));
   // Ensure the corresponding category is open
   const activeBtn = navButtons.find(b => b.dataset.module === key);
@@ -96,6 +101,8 @@ function switchModule(key, params) {
   title.textContent = mod.title;
   container.innerHTML = '';
   mod.mount(container, params || {});
+  // capture cleanup provided by module
+  try { if (typeof container._cleanup === 'function') currentCleanup = container._cleanup; } catch {}
   try { localStorage.setItem(STORAGE_KEYS.lastModule, key); } catch {}
 }
 
