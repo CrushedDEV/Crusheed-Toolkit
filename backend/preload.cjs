@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('ctk', {
   chooseDirectory: () => ipcRenderer.invoke('dialog:chooseDirectory'),
   chooseFile: () => ipcRenderer.invoke('dialog:chooseFile'),
   getDefaults: () => ipcRenderer.invoke('system:getDefaults'),
+  doc: {
+    docxToHtml: (filePath) => ipcRenderer.invoke('doc:docxToHtml', filePath),
+    docxToPdf: (filePath) => ipcRenderer.invoke('doc:docxToPdf', filePath),
+  },
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
     quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),

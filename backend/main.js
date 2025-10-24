@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { ensureYtDlp, downloadWithYtDlp, checkFfmpegAvailable } from './ytdlp.js';
 import { analyzeAudio, writeTags } from './analyze.js';
 import { scanLibrary, recommendTracks } from './library.js';
+import mammoth from 'mammoth';
 
 const isDev = !app.isPackaged;
 
@@ -37,6 +38,38 @@ async function createWindow() {
       sandbox: false
     }
   });
+
+// Documents: DOCX conversions
+ipcMain.handle('doc:docxToHtml', async (_evt, filePath) => {
+  try {
+    const buf = await fs.readFile(filePath);
+    const { value: html } = await mammoth.convertToHtml({ buffer: buf });
+    return { ok: true, html };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+});
+
+ipcMain.handle('doc:docxToPdf', async (_evt, filePath) => {
+  try {
+    const buf = await fs.readFile(filePath);
+    const { value: html } = await mammoth.convertToHtml({ buffer: buf });
+    // Create an offscreen window to render HTML and print to PDF
+    const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true, sandbox: false } });
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,Helvetica,sans-serif;}</style></head><body>${html}</body></html>`));
+    const pdfData = await win.webContents.printToPDF({
+      landscape: false,
+      pageSize: 'A4',
+      marginsType: 1
+    });
+    const outPath = filePath.replace(/\.docx?$/i, '') + '.pdf';
+    await fs.writeFile(outPath, pdfData);
+    try { win.destroy(); } catch {}
+    return { ok: true, filePath: outPath };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+});
 
 ipcMain.handle('proc:launchExe', async (_evt, payload) => {
   try{

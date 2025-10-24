@@ -19,7 +19,9 @@
     "node-id3": "^0.2.6",
     "pitchfinder": "^2.3.2",
     "jszip": "^3.10.1",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "mammoth": "^1.6.0",
+    "pdfjs-dist": "^4.8.69"
   },
   "devDependencies": {
     "electron": "^31.0.0",

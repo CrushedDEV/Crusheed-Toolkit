@@ -28,7 +28,10 @@ export function mountYouTubeModule(root) {
 
     <div style="margin-top:16px;">
       <div class="label">Progreso</div>
-      <div class="progress"><div id="yt-progress"></div></div>
+      <div class="row" style="align-items:center; gap:10px;">
+        <div class="progress" style="flex:1;"><div id="yt-progress"></div></div>
+        <span id="yt-percent" class="value-badge">0%</span>
+      </div>
       <div id="yt-status" class="small" style="margin-top:8px;"></div>
     </div>
   </div>
@@ -40,6 +43,7 @@ export function mountYouTubeModule(root) {
   const btnBrowse = $('#btn-browse', root);
   const btnDownload = $('#btn-download', root);
   const bar = $('#yt-progress', root);
+  const percentBadge = $('#yt-percent', root);
   const status = $('#yt-status', root);
 
   // Defaults
@@ -56,7 +60,9 @@ export function mountYouTubeModule(root) {
   const off = window.ctk.youtube.onProgress(({ percent }) => {
     if (typeof percent === 'number') {
       bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
-      status.textContent = `Descargando: ${percent.toFixed(1)}%`;
+      const txt = `${percent.toFixed(1)}%`;
+      status.textContent = `Descargando: ${txt}`;
+      if (percentBadge) percentBadge.textContent = txt;
     }
   });
 

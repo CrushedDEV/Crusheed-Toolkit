@@ -12,9 +12,12 @@ export function mountMixedKeyModule(root) {
         </div>
         <div class="small muted" style="margin-top:6px;">El escaneo incluye todas las subcarpetas.</div>
       </div>
-      <div style="flex:1;">
+      <div style="flex:1; min-width:220px;">
         <div class="label">Tolerancia BPM (±)</div>
-        <input id="mk-tol" type="number" value="3" min="0" step="1" />
+        <div class="slider-row">
+          <input id="mk-tol" type="range" value="3" min="0" max="10" step="1" />
+          <span id="mk-tol-val" class="value-badge">3</span>
+        </div>
       </div>
       <div style="align-self:flex-end;">
         <button id="mk-scan" class="primary">Escanear</button>
@@ -46,6 +49,7 @@ export function mountMixedKeyModule(root) {
   const btnBrowse = $('#mk-browse', root);
   const btnScan = $('#mk-scan', root);
   const tolInput = $('#mk-tol', root);
+  const tolVal = $('#mk-tol-val', root);
   const refSelect = $('#mk-ref', root);
   const filterInput = $('#mk-filter', root);
   const suggestBox = $('#mk-suggest', root);
@@ -59,6 +63,15 @@ export function mountMixedKeyModule(root) {
     const d = await window.ctk.chooseDirectory();
     if (d) folderInput.value = d;
   });
+
+  // Sync tolerance badge
+  function syncTol(){
+    if (tolVal) tolVal.textContent = String(Math.max(0, Math.min(10, parseInt(tolInput.value||'3',10))));
+  }
+  if (tolInput){
+    tolInput.addEventListener('input', syncTol);
+    syncTol();
+  }
 
   btnScan.addEventListener('click', async () => {
     const folder = (folderInput.value || '').trim();

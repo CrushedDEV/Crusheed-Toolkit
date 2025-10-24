@@ -16,14 +16,18 @@ export function mountAnalyzerModule(root, params={}) {
 
     <div style="margin-top:16px;" id="az-results" hidden>
       <div class="row">
-        <div class="card" style="flex:1;">
+        <div class="card" style="flex:1; display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
           <div class="label">BPM</div>
-          <div id="az-bpm" class="title">—</div>
+          <div id="az-bpm" class="big-badge">—</div>
         </div>
-        <div class="card" style="flex:1;">
+        <div class="card" style="flex:1; display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
           <div class="label">Tonalidad</div>
-          <div id="az-key" class="title">—</div>
+          <div id="az-key" class="big-badge">—</div>
         </div>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <div class="label">Confianza estimada</div>
+        <span id="az-conf" class="value-badge">—</span>
       </div>
       <div class="row" style="margin-top:12px;">
         <button id="az-write" class="ghost">Escribir en metadatos ID3</button>
@@ -39,6 +43,7 @@ export function mountAnalyzerModule(root, params={}) {
   const results = $('#az-results', root);
   const bpmEl = $('#az-bpm', root);
   const keyEl = $('#az-key', root);
+  const confEl = $('#az-conf', root);
   const btnWrite = $('#az-write', root);
 
   if (params.filePath) {
@@ -64,7 +69,9 @@ export function mountAnalyzerModule(root, params={}) {
       bpmEl.textContent = bpm ? String(bpm) : '—';
       keyEl.textContent = key ? String(key) : '—';
       results.hidden = false;
-      status.textContent = confidence ? `Confianza estimada: ${(confidence*100).toFixed(0)}%` : '';
+      const confTxt = (typeof confidence === 'number') ? `${(confidence*100).toFixed(0)}%` : '—';
+      if (confEl) confEl.textContent = confTxt;
+      status.textContent = '';
     } else {
       status.textContent = `Error: ${res.error}`;
     }
