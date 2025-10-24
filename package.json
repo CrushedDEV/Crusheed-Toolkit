@@ -21,7 +21,8 @@
     "jszip": "^3.10.1",
     "electron-updater": "^6.3.9",
     "mammoth": "^1.6.0",
-    "pdfjs-dist": "^4.8.69"
+    "pdfjs-dist": "^4.8.69",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "electron": "^31.0.0",

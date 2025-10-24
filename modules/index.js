@@ -3,6 +3,7 @@ import { mountAnalyzerModule } from './analyzer/ui.js';
 import { mountMixedKeyModule } from './mixedkey/ui.js';
 import { mountMcStartBatModule } from './mc_startbat/ui.js';
 import { mountConverterModule } from './converter/ui.js';
+import { mountSchedulerModule } from './scheduler/ui.js';
 
 function mountAbout(root) {
   root.innerHTML = '';
@@ -20,6 +21,7 @@ export const modules = {
   analyzer: { title: 'Analizador BPM/Tonalidad', mount: mountAnalyzerModule },
   mixedkey: { title: 'Compatibles (Camelot)', mount: mountMixedKeyModule },
   mc_startbat: { title: 'Minecraft • Generador start.bat', mount: mountMcStartBatModule },
-  converter: { title: 'Conversor/Optimizador de Imágenes', mount: mountConverterModule },
+  converter: { title: 'Conversor de Archivos', mount: mountConverterModule },
+  scheduler: { title: 'Programador de tareas', mount: mountSchedulerModule },
   about: { title: 'Acerca de', mount: mountAbout }
 };

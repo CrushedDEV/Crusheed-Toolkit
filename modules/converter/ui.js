@@ -15,11 +15,11 @@ export function mountConverterModule(root){
           <input id="files" type="file" accept="image/*,.docx" multiple style="display:none;" />
         </div>
         <div class="row" style="margin-top:8px;">
-          <button class="ghost" id="pick-btn">Seleccionar archivos...</button>
           <span class="small muted">Aceptados: Imágenes (PNG, JPG, WEBP, AVIF) y DOCX</span>
         </div>
       </div>
       <div id="img-panel" style="flex:1; min-width:200px; display:none;">
+        <div class="small muted">Conversión: de <strong>Imagen</strong> a</div>
         <div class="label">Formato de salida</div>
         <select id="format">
           <option value="auto" selected>AUTO (elige el más pequeño)</option>
@@ -53,9 +53,18 @@ export function mountConverterModule(root){
       <button class="primary" id="convert-all" style="display:none;">Convertir imágenes (ZIP)</button>
     </div>
 
-    <div id="docx-panel" class="row" style="margin-top:8px; display:none;">
-      <div class="label">Acciones para documentos DOCX</div>
-      <button class="ghost" id="docx-zip">DOCX → PDF (ZIP)</button>
+    <div id="docx-panel" class="row" style="margin-top:8px; display:none; gap:12px; align-items:flex-end;">
+      <div style="flex:1; min-width:220px;">
+        <div class="small muted">Conversión: de <strong>DOCX</strong> a</div>
+        <div class="label">Destino</div>
+        <select id="docx-target">
+          <option value="pdf" selected>PDF</option>
+          <option value="html">HTML (vista)</option>
+        </select>
+      </div>
+      <div>
+        <button class="ghost" id="docx-zip">Convertir DOCX (ZIP)</button>
+      </div>
     </div>
 
     <div class="label" style="margin-top:12px;">Archivos</div>
@@ -73,7 +82,6 @@ export function mountConverterModule(root){
   const q = (sel)=>card.querySelector(sel);
   const input = q('#files');
   const dropzone = q('#dropzone');
-  const pickBtn = q('#pick-btn');
   const fmt = q('#format');
   const quality = q('#quality');
   const qualityVal = q('#quality-val');
@@ -87,6 +95,7 @@ export function mountConverterModule(root){
   const imgResize = q('#img-resize');
   const docxPanel = q('#docx-panel');
   const btnDocxZip = q('#docx-zip');
+  const docxTargetSel = q('#docx-target');
   const area = q('#preview-area');
   const actionsList = q('#actions-list');
   const list = q('#file-list');
@@ -128,21 +137,27 @@ export function mountConverterModule(root){
       for (const f of docxFiles){
         const p = await ensureFilePath(f);
         if (!p) continue;
-        const res = await window.ctk.doc.docxToPdf(p);
-        if (res?.ok && res.filePath){
-          outputs.push(res.filePath);
+        const target = (docxTargetSel && docxTargetSel.value) || 'pdf';
+        if (target === 'pdf'){
+          const res = await window.ctk.doc.docxToPdf(p);
+          if (res?.ok && res.filePath) outputs.push(res.filePath);
+        } else {
+          const res = await window.ctk.doc.docxToHtml(p);
+          if (res?.ok && res.html){
+            const outPath = p.replace(/\.[^.]+$/, '') + '.html';
+            // Guardar HTML mediante diálogo (como archivo .html)
+            const saved = await window.ctk.file.save({
+              title: 'Guardar HTML',
+              defaultPath: outPath,
+              filters: [{ name: 'HTML', extensions: ['html','htm'] }],
+              dataBase64: btoa(unescape(encodeURIComponent(res.html)))
+            });
+            if (saved?.ok && saved.filePath) outputs.push(saved.filePath);
+          }
         }
       }
       if (!outputs.length) return;
-      const { default: JSZip } = await import('jszip');
-      const zip = new JSZip();
-      for (const outPath of outputs){
-        try{
-          // Bring file content from main via shell? We don't have direct fs in renderer; request save dialog with base64 requires reading file.
-          // Simpler: Show folder for first output and skip ZIP if multiple handling is complex without fs in renderer.
-        }catch{}
-      }
-      // As fallback, abrir carpeta del primer resultado
+      // Abrir carpeta del primer resultado
       if (outputs[0]) window.ctk.shell.showItemInFolder(outputs[0]);
     });
   }
@@ -384,7 +399,6 @@ export function mountConverterModule(root){
 
   // Bind input and dropzone
   input.addEventListener('change', ()=> { filesState = Array.from(input.files || []); renderList(filesState); renderActions(filesState); updatePanels(); });
-  if (pickBtn) pickBtn.addEventListener('click', ()=> input.click());
   setupDropzone();
   renderList(filesState);
   renderActions(filesState);

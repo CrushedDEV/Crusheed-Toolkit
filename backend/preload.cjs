@@ -72,6 +72,19 @@ contextBridge.exposeInMainWorld('ctk', {
     scan: (folder) => ipcRenderer.invoke('library:scan', folder),
     recommend: (payload) => ipcRenderer.invoke('library:recommend', payload)
   },
+  scheduler: {
+    list: () => ipcRenderer.invoke('scheduler:list'),
+    create: (def) => ipcRenderer.invoke('scheduler:create', def),
+    remove: (id) => ipcRenderer.invoke('scheduler:remove', id),
+    toggle: (id, enabled) => ipcRenderer.invoke('scheduler:toggle', { id, enabled }),
+    runNow: (id) => ipcRenderer.invoke('scheduler:runNow', id),
+    logs: (id) => ipcRenderer.invoke('scheduler:logs', id),
+  },
+  winsched: {
+    list: () => ipcRenderer.invoke('winsched:list'),
+    create: (payload) => ipcRenderer.invoke('winsched:create', payload),
+    delete: (name) => ipcRenderer.invoke('winsched:delete', name),
+  },
   file: {
     save: (payload) => ipcRenderer.invoke('file:save', payload)
   },

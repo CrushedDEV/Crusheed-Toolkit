@@ -10,6 +10,7 @@ import { ensureYtDlp, downloadWithYtDlp, checkFfmpegAvailable } from './ytdlp.js
 import { analyzeAudio, writeTags } from './analyze.js';
 import { scanLibrary, recommendTracks } from './library.js';
 import mammoth from 'mammoth';
+import { initScheduler, listJobs as schedList, createJob as schedCreate, removeJob as schedRemove, toggleJob as schedToggle, runNow as schedRunNow, getLogs as schedGetLogs } from './scheduler.js';
 
 const isDev = !app.isPackaged;
 
@@ -38,6 +39,75 @@ async function createWindow() {
       sandbox: false
     }
   });
+
+// In-app scheduler IPC
+ipcMain.handle('scheduler:list', async () => {
+  try { return { ok:true, jobs: schedList() }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+ipcMain.handle('scheduler:create', async (_e, def) => {
+  try { const d = await schedCreate(def, true); return { ok:true, def: d }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+ipcMain.handle('scheduler:remove', async (_e, id) => {
+  try { const r = await schedRemove(id); return { ok: r }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+ipcMain.handle('scheduler:toggle', async (_e, payload) => {
+  try { const { id, enabled } = payload || {}; const r = await schedToggle(id, enabled); return { ok: r }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+ipcMain.handle('scheduler:runNow', async (_e, id) => {
+  try { await schedRunNow(id); return { ok:true }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+ipcMain.handle('scheduler:logs', async (_e, id) => {
+  try { return { ok:true, logs: schedGetLogs(id) }; } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+
+// Windows Task Scheduler (schtasks) minimal IPC
+function runSchTasks(args){
+  return new Promise((resolve) => {
+    const child = spawn('schtasks', args, { windowsHide:true, shell:true });
+    let out=''; let err='';
+    child.stdout.on('data', d => out += d.toString());
+    child.stderr.on('data', d => err += d.toString());
+    child.on('close', (code)=> resolve({ code, out, err }));
+  });
+}
+
+ipcMain.handle('winsched:list', async () => {
+  try {
+    const r = await runSchTasks(['/Query', '/FO', 'CSV', '/V']);
+    if (r.code !== 0) return { ok:false, error: r.err || r.out };
+    return { ok:true, raw: r.out };
+  } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+
+ipcMain.handle('winsched:create', async (_e, payload) => {
+  try {
+    const { name, cmd, schedule, startTime } = payload || {};
+    if (!name || !cmd || !schedule) return { ok:false, error:'Parámetros insuficientes' };
+    const args = ['/Create', '/TN', name, '/TR', `"${cmd}"`, '/F'];
+    // schedule: DAILY@HH:MM or MINUTE@N
+    if (schedule.type === 'DAILY') {
+      args.push('/SC', 'DAILY');
+      if (startTime) args.push('/ST', startTime);
+    } else if (schedule.type === 'MINUTE') {
+      args.push('/SC', 'MINUTE', '/MO', String(schedule.every || 5));
+    } else {
+      args.push('/SC', 'ONCE');
+      if (startTime) args.push('/ST', startTime);
+    }
+    const r = await runSchTasks(args);
+    if (r.code !== 0) return { ok:false, error: r.err || r.out };
+    return { ok:true };
+  } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
+
+ipcMain.handle('winsched:delete', async (_e, name) => {
+  try {
+    if (!name) return { ok:false, error:'Nombre requerido' };
+    const r = await runSchTasks(['/Delete', '/TN', name, '/F']);
+    if (r.code !== 0) return { ok:false, error: r.err || r.out };
+    return { ok:true };
+  } catch (err) { return { ok:false, error: err?.message || String(err) }; }
+});
 
 // Documents: DOCX conversions
 ipcMain.handle('doc:docxToHtml', async (_evt, filePath) => {
@@ -121,6 +191,8 @@ ipcMain.handle('proc:launchExe', async (_evt, payload) => {
 
 app.whenReady().then(() => {
   createWindow();
+  // Init in-app scheduler persistence
+  try { initScheduler(app.getPath('userData')); } catch {}
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
