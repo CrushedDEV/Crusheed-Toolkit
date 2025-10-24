@@ -47,6 +47,19 @@ function setupUpdaterBanner() {
 // Initialize updater banner
 setupUpdaterBanner();
 
+const btnUpdate = document.getElementById('btn-update-check');
+if (btnUpdate && window.ctk && window.ctk.updater) {
+  btnUpdate.addEventListener('click', () => {
+    try { window.ctk.updater.check(); } catch {}
+  });
+}
+
+if (window.ctk && window.ctk.updater) {
+  setInterval(() => {
+    try { window.ctk.updater.check(); } catch {}
+  }, 10 * 60 * 1000);
+}
+
 const STORAGE_KEYS = {
   openCats: 'ctkOpenCats',
   lastModule: 'ctkLastModule',
