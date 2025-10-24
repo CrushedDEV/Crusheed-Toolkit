@@ -1,3 +1,6 @@
+> [!WARNING]
+> Esta aplicación se proporciona con fines educativos y de demostración. El uso de las herramientas incluidas debe cumplir las leyes de tu jurisdicción y los términos de servicio de las plataformas o contenidos implicados. Los autores y colaboradores no asumen responsabilidad por usos indebidos, infracciones de derechos de autor o cualquier daño derivado del uso del software. Al utilizar esta aplicación, aceptas que lo haces bajo tu propia responsabilidad.
+
 # Crushed Toolkit
 
 Aplicación de escritorio (Electron) con herramientas modulares:
@@ -47,10 +50,6 @@ Los usuarios verán un banner en la app cuando exista una nueva versión, con bo
   - Arrastra archivos al área o usa “Seleccionar archivos…”.
   - Imágenes: ajusta formato, calidad y tamaño; convierte en lote (ZIP) o previsualiza.
   - DOCX: usa “DOCX → HTML (vista)” o “DOCX → PDF”.
-
-## Aviso legal y ámbito educativo
-
-Esta aplicación se proporciona con fines educativos y de demostración. El uso de las herramientas incluidas debe cumplir las leyes de tu jurisdicción y los términos de servicio de las plataformas o contenidos implicados. Los autores y colaboradores no asumen responsabilidad por usos indebidos, infracciones de derechos de autor o cualquier daño derivado del uso del software. Al utilizar esta aplicación, aceptas que lo haces bajo tu propia responsabilidad.
 
 ## Licencia
 
