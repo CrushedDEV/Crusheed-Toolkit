@@ -12,10 +12,11 @@ export function mountConverterModule(root){
         <div class="label">Arrastra archivos aquí</div>
         <div id="dropzone" style="border:1px dashed var(--border); background:#0a0a0a; border-radius:12px; padding:18px; text-align:center; color:var(--text-dim);" aria-label="Zona de soltar" role="button" tabindex="0">
           Suelta archivos o haz clic para seleccionar
-          <input id="files" type="file" multiple style="display:none;" />
+          <input id="files" type="file" accept="image/*,.docx" multiple style="display:none;" />
         </div>
         <div class="row" style="margin-top:8px;">
           <button class="ghost" id="pick-btn">Seleccionar archivos...</button>
+          <span class="small muted">Aceptados: Imágenes (PNG, JPG, WEBP, AVIF) y DOCX</span>
         </div>
       </div>
       <div id="img-panel" style="flex:1; min-width:200px; display:none;">
