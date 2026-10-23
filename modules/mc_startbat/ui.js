@@ -1,53 +1,50 @@
-export function mountMcStartBatModule(root){
+export function mountMcStartBatModule(root, params = {}){
   root.innerHTML = '';
 
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <h2 class="title">Generador start.bat para servidores</h2>
-    <p class="small muted">Configura memoria, nombre del JAR y flags (Aikar) para optimizar tu servidor Paper/Spigot/Purpur.</p>
-
-    <div class="row" style="margin-top:8px; flex-wrap:wrap;">
-      <div style="flex:1; min-width:220px;">
+    <div class="grid grid-3">
+      <div class="field">
         <div class="label">RAM mínima (Xms)</div>
         <input id="ram-min" type="text" placeholder="1G" value="1G" />
       </div>
-      <div style="flex:1; min-width:220px;">
+      <div class="field">
         <div class="label">RAM máxima (Xmx)</div>
         <input id="ram-max" type="text" placeholder="4G" value="4G" />
       </div>
-      <div style="flex:1; min-width:220px;">
+      <div class="field">
         <div class="label">Nombre del JAR</div>
         <input id="jar-name" type="text" placeholder="server.jar" value="server.jar" />
       </div>
-    </div>
-
-    <div class="row" style="margin-top:8px; flex-wrap:wrap;">
-      <div style="flex:1; min-width:220px;">
+      <div class="field">
         <div class="label">Preset de flags</div>
         <select id="flags-preset">
           <option value="aikar" selected>Aikar (Paper/Purpur)</option>
           <option value="vanilla">Vanilla (sin flags)</option>
         </select>
       </div>
-      <div style="flex:1; min-width:220px;">
+      <div class="field">
         <div class="label">Ruta de Java (opcional)</div>
         <input id="java-path" type="text" placeholder="C:\\Program Files\\Java\\bin\\java.exe" />
       </div>
-      <div style="flex:1; min-width:220px; display:flex; align-items:flex-end; gap:8px;">
-        <label class="small" style="display:flex; align-items:center; gap:8px;">
+      <div class="field" style="justify-content:flex-end;">
+        <label class="small" style="min-height:42px;">
           <input id="agree-eula" type="checkbox" /> Aceptar EULA automáticamente
         </label>
       </div>
     </div>
 
-    <div class="row" style="margin-top:12px;">
-      <button class="ghost" id="preview">Previsualizar</button>
+    <div class="actions">
       <button class="primary" id="download">Descargar start.bat</button>
+      <button class="ghost" id="copy">Copiar</button>
+      <button class="ghost" id="preview" hidden>Previsualizar</button>
     </div>
 
-    <div class="label" style="margin-top:12px;">Contenido generado</div>
-    <pre id="output" style="background:#0a0a0a; border:1px solid var(--border); border-radius:12px; padding:12px; white-space:pre-wrap; word-break:break-word; max-height:240px; overflow:auto;"></pre>
+    <div class="field">
+      <div class="label">Contenido generado</div>
+      <pre id="output" class="code"></pre>
+    </div>
   `;
 
   root.appendChild(card);
@@ -62,6 +59,13 @@ export function mountMcStartBatModule(root){
   const output = q('#output');
   const btnPrev = q('#preview');
   const btnDown = q('#download');
+  const btnCopy = q('#copy');
+  btnCopy.addEventListener('click', async ()=>{
+    updatePreview();
+    try { await navigator.clipboard.writeText(output.textContent); btnCopy.textContent = '¡Copiado!'; }
+    catch { btnCopy.textContent = 'No se pudo copiar'; }
+    setTimeout(()=>{ btnCopy.textContent = 'Copiar'; }, 1500);
+  });
 
   const AIKAR_FLAGS = [
     '-XX:+UseG1GC',
@@ -104,7 +108,7 @@ set XMX=${xmx}
 set JAR=${jarName}
 ${eulaPart}
 :loop
-${javaCmd} -Xms%XMS% -Xmx%XMX% ${flags} -jar %JAR% --nogui
+${javaCmd} -Xms%XMS% -Xmx%XMX% ${flags} -jar %JAR% nogui
 
 echo.
 echo El servidor se ha detenido. Reiniciando en 5 segundos...
@@ -118,17 +122,35 @@ goto loop
     output.textContent = buildBat();
   }
 
-  [ramMin, ramMax, jar, preset, javaPath, agree].forEach(el => el.addEventListener('input', updatePreview));
+  [ramMin, ramMax, jar, preset, javaPath, agree].forEach(el => { el.addEventListener('input', updatePreview); el.addEventListener('change', updatePreview); });
   btnPrev.addEventListener('click', updatePreview);
-  btnDown.addEventListener('click', ()=>{
+  btnDown.addEventListener('click', async ()=>{
     updatePreview();
-    const blob = new Blob([output.textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'start.bat';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    const text = output.textContent.replace(/\r?\n/g, '\r\n');
+    const r = await window.ctk.file.save({
+      title: 'Guardar start.bat',
+      defaultPath: params.folder ? `${params.folder}\\start.bat` : 'start.bat',
+      filters: [{ name: 'Script de Windows', extensions: ['bat'] }],
+      dataBase64: btoa(unescape(encodeURIComponent(text)))
+    });
+    if (r?.ok && r.filePath) window.ctk.shell.showItemInFolder(r.filePath);
   });
+
+  // Opened from the Minecraft server tool: pre-fill the jar and offer to save straight into that folder
+  if (params.jar) jar.value = params.jar;
+  if (params.folder) {
+    const btnSaveHere = document.createElement('button');
+    btnSaveHere.className = 'primary';
+    btnSaveHere.textContent = 'Guardar en la carpeta del servidor';
+    btnSaveHere.addEventListener('click', async ()=>{
+      updatePreview();
+      const r = await window.ctk.mc.writeStartBat({ folder: params.folder, content: output.textContent });
+      btnSaveHere.textContent = r.ok ? '¡Guardado!' : `Error: ${r.error}`;
+      if (r.ok) window.ctk.shell.showItemInFolder(r.file);
+    });
+    btnDown.className = 'ghost';
+    btnDown.before(btnSaveHere);
+  }
 
   updatePreview();
 }

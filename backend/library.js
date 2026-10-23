@@ -41,7 +41,7 @@ function normNote(n) {
   return INDEX_TO_NOTE_SHARP[idx];
 }
 
-function musicalToCamelot(note, mode) {
+export function musicalToCamelot(note, mode) {
   if (!note || !mode) return null;
   const idx = NOTE_INDEX[note];
   if (idx == null) return null;
@@ -69,7 +69,7 @@ function camelotToMusical(number, letter) {
   return { note: CAMELOT_TO_MINOR[num], mode: 'minor' };
 }
 
-function normalizeTags(tags) {
+export function normalizeTags(tags) {
   const bpmRaw = tags.TBPM || tags.bpm || tags.BPM || tags.tbpm;
   const keyRaw = tags.TKEY || tags.initialKey || tags.key || tags.tkey;
   const bpm = bpmRaw ? Number(String(bpmRaw).replace(/,/, '.')) : null;
@@ -80,7 +80,7 @@ function normalizeTags(tags) {
   return { bpm: bpm || null, key: keyRaw || (note && mode ? `${note} ${mode}` : null), camelot };
 }
 
-async function listAudioFiles(rootDir) {
+export async function listAudioFiles(rootDir) {
   const out = [];
   async function walk(dir) {
     let items;
@@ -103,9 +103,9 @@ export async function scanLibrary(folder) {
     try {
       const tags = NodeID3.read(f) || {};
       const norm = normalizeTags(tags);
-      tracks.push({ file: f, title: tags.title || path.basename(f), artist: tags.artist || '', bpm: norm.bpm, key: norm.key, camelot: norm.camelot });
+      tracks.push({ file: f, title: tags.title || path.basename(f), artist: tags.artist || '', album: tags.album || '', hasCover: Boolean(tags.image), bpm: norm.bpm, key: norm.key, camelot: norm.camelot });
     } catch {
-      tracks.push({ file: f, title: path.basename(f), artist: '', bpm: null, key: null, camelot: null });
+      tracks.push({ file: f, title: path.basename(f), artist: '', album: '', hasCover: false, bpm: null, key: null, camelot: null });
     }
   }
   return tracks;

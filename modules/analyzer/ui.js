@@ -3,35 +3,36 @@ const $ = (sel, root=document) => root.querySelector(sel);
 export function mountAnalyzerModule(root, params={}) {
   root.innerHTML = `
   <div class="card">
-    <div class="label">Archivo de audio (MP3 recomendado)</div>
-    <div class="row">
-      <input id="az-file" type="text" placeholder="Selecciona un archivo .mp3" />
-      <button id="az-browse" class="ghost">Elegir archivo…</button>
+    <div class="field">
+      <div class="label">Archivo de audio (MP3 recomendado)</div>
+      <div class="input-group">
+        <input id="az-file" type="text" placeholder="Selecciona un archivo de audio" />
+        <button id="az-browse" class="ghost">Elegir archivo…</button>
+      </div>
     </div>
-
-    <div class="row" style="margin-top:12px;">
+    <div class="actions">
       <button id="az-analyze" class="primary">Analizar BPM y tonalidad</button>
-      <div id="az-status" class="small"></div>
+      <div id="az-status" class="status"></div>
     </div>
+  </div>
 
-    <div style="margin-top:16px;" id="az-results" hidden>
-      <div class="row">
-        <div class="card" style="flex:1; display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
-          <div class="label">BPM</div>
-          <div id="az-bpm" class="big-badge">—</div>
-        </div>
-        <div class="card" style="flex:1; display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
-          <div class="label">Tonalidad</div>
-          <div id="az-key" class="big-badge">—</div>
-        </div>
+  <div class="card" id="az-results" hidden>
+    <div class="grid grid-3" style="align-items:end;">
+      <div class="field">
+        <div class="label">BPM</div>
+        <div id="az-bpm" class="big-badge">—</div>
       </div>
-      <div class="row" style="margin-top:6px;">
+      <div class="field">
+        <div class="label">Tonalidad</div>
+        <div id="az-key" class="big-badge">—</div>
+      </div>
+      <div class="field">
         <div class="label">Confianza estimada</div>
-        <span id="az-conf" class="value-badge">—</span>
+        <span id="az-conf" class="value-badge" style="align-self:flex-start;">—</span>
       </div>
-      <div class="row" style="margin-top:12px;">
-        <button id="az-write" class="ghost">Escribir en metadatos ID3</button>
-      </div>
+    </div>
+    <div class="actions">
+      <button id="az-write" class="ghost">Escribir en metadatos ID3</button>
     </div>
   </div>
   `;
@@ -64,10 +65,10 @@ export function mountAnalyzerModule(root, params={}) {
     results.hidden = true;
     const res = await window.ctk.audio.analyze(fp);
     if (res.ok) {
-      const { bpm, key, confidence } = res.result || {};
+      const { bpm, key, camelot, confidence } = res.result || {};
       lastResult = { bpm, key };
       bpmEl.textContent = bpm ? String(bpm) : '—';
-      keyEl.textContent = key ? String(key) : '—';
+      keyEl.textContent = key ? `${key}${camelot ? ` · ${camelot}` : ""}` : "—";
       results.hidden = false;
       const confTxt = (typeof confidence === 'number') ? `${(confidence*100).toFixed(0)}%` : '—';
       if (confEl) confEl.textContent = confTxt;

@@ -4,77 +4,76 @@ export function mountConverterModule(root){
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <h2 class="title">Convertidor de Archivos</h2>
-    <p class="small muted">Imágenes: AVIF/WebP/JPEG/PNG, Redimensionado HQ • Documentos: DOCX → HTML/PDF</p>
+    <div id="dropzone" class="dropzone" aria-label="Zona de soltar" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+      <div><strong>Suelta archivos aquí</strong> o haz clic para seleccionar</div>
+      <div class="small">Imágenes (PNG, JPG, WEBP, AVIF) y documentos DOCX</div>
+      <input id="files" type="file" accept="image/*,.docx" multiple style="display:none;" />
+    </div>
 
-    <div class="row" style="margin-top:8px; flex-wrap:wrap;">
-      <div style="flex:2; min-width:260px;">
-        <div class="label">Arrastra archivos aquí</div>
-        <div id="dropzone" style="border:1px dashed var(--border); background:#0a0a0a; border-radius:12px; padding:18px; text-align:center; color:var(--text-dim);" aria-label="Zona de soltar" role="button" tabindex="0">
-          Suelta archivos o haz clic para seleccionar
-          <input id="files" type="file" accept="image/*,.docx" multiple style="display:none;" />
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <span class="small muted">Aceptados: Imágenes (PNG, JPG, WEBP, AVIF) y DOCX</span>
-        </div>
-      </div>
-      <div id="img-panel" style="flex:1; min-width:200px; display:none;">
-        <div class="small muted">Conversión: de <strong>Imagen</strong> a</div>
+    <div class="grid grid-3" id="img-options">
+      <div id="img-panel" class="field" style="display:none;">
         <div class="label">Formato de salida</div>
         <select id="format">
-          <option value="auto" selected>AUTO (elige el más pequeño)</option>
+          <option value="auto" selected>AUTO (el más ligero)</option>
           <option value="image/avif">AVIF</option>
           <option value="image/webp">WebP</option>
           <option value="image/jpeg">JPEG</option>
           <option value="image/png">PNG</option>
         </select>
       </div>
-      <div id="img-quality" style="flex:1; min-width:220px; display:none;">
+      <div id="img-quality" class="field" style="display:none;">
         <div class="label">Calidad (JPEG/WebP/AVIF)</div>
         <div class="slider-row">
           <input id="quality" type="range" min="0" max="100" value="85" />
           <span id="quality-val" class="value-badge">85</span>
         </div>
       </div>
-      <div id="img-resize" style="flex:1; min-width:200px; display:none;">
-        <div class="label">Redimensionar</div>
-        <div class="row">
-          <input id="width" type="text" placeholder="Ancho (px)" />
-          <input id="height" type="text" placeholder="Alto (px)" />
+      <div id="img-resize" class="field" style="display:none;">
+        <div class="label">Redimensionar (px)</div>
+        <div class="input-group">
+          <input id="width" type="text" placeholder="Ancho" />
+          <input id="height" type="text" placeholder="Alto" />
         </div>
-        <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+        <label class="small" style="margin-top:8px;">
           <input id="keep-ar" type="checkbox" checked /> Mantener proporción
         </label>
       </div>
     </div>
 
-    <div class="row" style="margin-top:12px;">
-      <button class="ghost" id="preview" style="display:none;">Previsualizar primera imagen</button>
+    <div class="actions">
       <button class="primary" id="convert-all" style="display:none;">Convertir imágenes (ZIP)</button>
+      <button class="ghost" id="preview" style="display:none;">Previsualizar primera imagen</button>
     </div>
 
-    <div id="docx-panel" class="row" style="margin-top:8px; display:none; gap:12px; align-items:flex-end;">
-      <div style="flex:1; min-width:220px;">
-        <div class="small muted">Conversión: de <strong>DOCX</strong> a</div>
-        <div class="label">Destino</div>
+    <div id="docx-panel" class="grid" style="display:none; grid-template-columns:240px auto; align-items:end; justify-content:start;">
+      <div class="field">
+        <div class="label">Convertir DOCX a</div>
         <select id="docx-target">
           <option value="pdf" selected>PDF</option>
-          <option value="html">HTML (vista)</option>
+          <option value="html">HTML</option>
         </select>
       </div>
       <div>
-        <button class="ghost" id="docx-zip">Convertir DOCX (ZIP)</button>
+        <button class="ghost" id="docx-zip">Convertir todos los DOCX</button>
       </div>
     </div>
 
-    <div class="label" style="margin-top:12px;">Archivos</div>
-    <div id="file-list" class="card" style="background:#0a0a0a; border-radius:12px; padding:10px; max-height:200px; overflow:auto;"></div>
+    <div class="grid grid-2">
+      <div class="field">
+        <div class="label">Archivos</div>
+        <div id="file-list" class="well" style="max-height:220px;"></div>
+      </div>
+      <div class="field">
+        <div class="label">Acciones por archivo</div>
+        <div id="actions-list" class="well" style="max-height:220px;"></div>
+      </div>
+    </div>
 
-    <div class="label" style="margin-top:12px;">Acciones por archivo</div>
-    <div id="actions-list" class="card" style="background:#0a0a0a; border-radius:12px; padding:10px; max-height:240px; overflow:auto;"></div>
-
-    <div class="label" style="margin-top:12px;">Previsualización</div>
-    <div id="preview-area" class="row" style="gap:16px; align-items:flex-start;"></div>
+    <div class="field">
+      <div class="label">Previsualización</div>
+      <div id="preview-area" class="row" style="gap:16px; align-items:flex-start;"><div class="small">Pulsa «Previsualizar» para ver el resultado.</div></div>
+    </div>
   `;
 
   root.appendChild(card);
@@ -100,7 +99,6 @@ export function mountConverterModule(root){
   const actionsList = q('#actions-list');
   const list = q('#file-list');
 
-  const supportsSave = !!(window.ctk && window.ctk.file && window.ctk.file.save);
   let filesState = [];
 
   function fileToImage(file){
@@ -123,9 +121,11 @@ export function mountConverterModule(root){
     if (docxPanel) docxPanel.style.display = anyDocx ? '' : 'none';
   }
 
+  // Real filesystem path of a dropped/selected File (File.path no longer exists in Electron 32+)
   async function ensureFilePath(f){
-    if (f && f.path) return f.path;
-    const chosen = await window.ctk.chooseFile();
+    const p = f ? window.ctk.getPathForFile(f) : null;
+    if (p) return p;
+    const chosen = await window.ctk.chooseFile([{ name: 'Documentos Word', extensions: ['docx'] }]);
     return chosen || null;
   }
 
@@ -141,6 +141,7 @@ export function mountConverterModule(root){
         if (target === 'pdf'){
           const res = await window.ctk.doc.docxToPdf(p);
           if (res?.ok && res.filePath) outputs.push(res.filePath);
+          else alert(`No se pudo convertir ${f.name}: ${res?.error || 'error desconocido'}`);
         } else {
           const res = await window.ctk.doc.docxToHtml(p);
           if (res?.ok && res.html){
@@ -235,18 +236,10 @@ export function mountConverterModule(root){
     return 'bin';
   }
 
-  async function blobToBase64(blob){
-    return new Promise((resolve)=>{
-      const r = new FileReader();
-      r.onload = ()=> resolve(r.result);
-      r.readAsDataURL(blob);
-    });
-  }
-
   function renderList(files){
     list.innerHTML = '';
     if (!files || !files.length){
-      list.innerHTML = '<div class="small muted">No hay archivos seleccionados.</div>';
+      list.innerHTML = '<div class="empty">No hay archivos seleccionados.</div>';
       return;
     }
     files.forEach((file, i)=>{
@@ -269,12 +262,13 @@ export function mountConverterModule(root){
   function renderActions(files){
     actionsList.innerHTML = '';
     if (!files || !files.length){
-      actionsList.innerHTML = '<div class="small muted">Añade archivos para ver acciones disponibles.</div>';
+      actionsList.innerHTML = '<div class="empty">Añade archivos para ver acciones disponibles.</div>';
       return;
     }
     files.forEach((file, idx)=>{
       const row = document.createElement('div');
       row.className = 'row';
+      row.style.padding = '6px 2px';
       const name = document.createElement('div');
       name.className = 'small';
       name.style.flex = '1';
@@ -288,7 +282,7 @@ export function mountConverterModule(root){
         row.appendChild(hint);
       } else if (isDocxFile(file)){
         const btnHtml = document.createElement('button');
-        btnHtml.className = 'ghost';
+        btnHtml.className = 'ghost sm';
         btnHtml.textContent = 'DOCX → HTML (vista)';
         btnHtml.onclick = async ()=>{
           const path = await pickFilePathIfNeeded(idx);
@@ -297,16 +291,17 @@ export function mountConverterModule(root){
           if (res?.ok){
             const win = window.open('', '_blank');
             if (win){ win.document.write(res.html); win.document.close(); }
-          }
+          } else alert(`No se pudo convertir: ${res?.error || 'error desconocido'}`);
         };
         const btnPdf = document.createElement('button');
-        btnPdf.className = 'ghost';
+        btnPdf.className = 'ghost sm';
         btnPdf.textContent = 'DOCX → PDF (guardar)';
         btnPdf.onclick = async ()=>{
           const path = await pickFilePathIfNeeded(idx);
           if (!path) return;
           const res = await window.ctk.doc.docxToPdf(path);
           if (res?.ok && res.filePath){ window.ctk.shell.showItemInFolder(res.filePath); }
+          else alert(`No se pudo convertir: ${res?.error || 'error desconocido'}`);
         };
         row.appendChild(btnHtml);
         row.appendChild(btnPdf);
@@ -320,14 +315,8 @@ export function mountConverterModule(root){
     });
   }
 
-  // Helper to get FileSystem path for dropped File (Electron provides path on files from input)
-  async function pickFilePathIfNeeded(index){
-    const f = filesState[index];
-    // Attempt to use path if present (Electron adds path on file entries from input)
-    if (f && f.path) return f.path;
-    // Fallback: pedir al usuario seleccionar el archivo original
-    const chosen = await window.ctk.chooseFile();
-    return chosen || null;
+  function pickFilePathIfNeeded(index){
+    return ensureFilePath(filesState[index]);
   }
 
   btnPrev.addEventListener('click', async ()=>{
@@ -339,7 +328,7 @@ export function mountConverterModule(root){
     if (!out) return;
     const url = URL.createObjectURL(out.blob);
     const img = document.createElement('img');
-    img.src = url; img.style.maxWidth = '280px'; img.style.borderRadius = '12px';
+    img.src = url; img.style.maxWidth = '320px'; img.style.borderRadius = '12px'; img.style.border = '1px solid var(--border)';
     const meta = document.createElement('div');
     meta.className = 'small muted';
     meta.textContent = `${extFor(out.type).toUpperCase()} • ${(out.blob.size/1024).toFixed(1)} KB`;
@@ -350,37 +339,28 @@ export function mountConverterModule(root){
   btnConvAll.addEventListener('click', async ()=>{
     if (!filesState.length) return;
     const files = Array.from(filesState).filter(isImageFile);
-    const { default: JSZip } = await import('jszip');
-    const zip = new JSZip();
+    // The ZIP is built in the main process (jszip can't be imported from the renderer without a bundler)
+    const entries = [];
+    const usedNames = new Set();
     for (const f of files){
       const out = await convertFileBest(f);
       if (!out) continue;
       const nameNoExt = f.name.replace(/\.[^.]+$/, '');
       const ext = extFor(out.type);
-      zip.file(`${nameNoExt}.${ext}`, out.blob);
+      let name = `${nameNoExt}.${ext}`;
+      for (let i = 2; usedNames.has(name); i++) name = `${nameNoExt}-${i}.${ext}`;
+      usedNames.add(name);
+      entries.push({ name, data: new Uint8Array(await out.blob.arrayBuffer()) });
     }
-    const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-    if (supportsSave){
-      const base64 = await blobToBase64(content);
-      await window.ctk.file.save({
-        title: 'Guardar ZIP',
-        defaultPath: 'converted_images.zip',
-        dataBase64: base64.split(',')[1],
-        filters: [{ name:'ZIP', extensions:['zip'] }]
-      });
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(content);
-      a.download = 'converted_images.zip';
-      document.body.appendChild(a); a.click(); a.remove();
-    }
+    if (!entries.length) { alert('No se pudo convertir ninguna imagen.'); return; }
+    const r = await window.ctk.file.saveZip({ title: 'Guardar ZIP', defaultPath: 'converted_images.zip', entries });
+    if (r?.ok && r.filePath) window.ctk.shell.showItemInFolder(r.filePath);
+    else if (r && !r.ok && !r.canceled) alert(`No se pudo guardar el ZIP: ${r.error}`);
   });
 
   function setupDropzone(){
     function setHover(on){
-      dropzone.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
-      dropzone.style.background = on ? '#0e0e0e' : '#0a0a0a';
-      dropzone.style.cursor = 'pointer';
+      dropzone.classList.toggle('is-over', on);
     }
     dropzone.addEventListener('click', ()=> input.click());
     dropzone.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); input.click(); } });
@@ -414,4 +394,8 @@ export function mountConverterModule(root){
   const preventWinDnD = (e)=>{ e.preventDefault(); };
   window.addEventListener('dragover', preventWinDnD);
   window.addEventListener('drop', preventWinDnD);
+  root._cleanup = () => {
+    window.removeEventListener('dragover', preventWinDnD);
+    window.removeEventListener('drop', preventWinDnD);
+  };
 }

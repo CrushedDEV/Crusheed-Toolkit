@@ -4,6 +4,12 @@ import cron from 'node-cron';
 import { spawn } from 'node:child_process';
 
 const jobs = new Map(); // id -> { def, task, lastRun, lastExit, logs: [] }
+// Built-in actions a job can run instead of a shell command (e.g. Minecraft world backups)
+const actions = new Map(); // name -> { label, run(args) -> Promise<string> }
+
+export function registerAction(name, label, run){
+  actions.set(name, { label, run });
+}
 let storePath = null;
 
 function nowIso(){ return new Date().toISOString(); }
@@ -33,7 +39,8 @@ export function listJobs(){
     id: j.def.id,
     name: j.def.name,
     cron: j.def.cron,
-    cmd: j.def.cmd,
+    cmd: j.def.action ? (actions.get(j.def.action)?.label || j.def.action) : j.def.cmd,
+    action: j.def.action || null,
     args: j.def.args,
     cwd: j.def.cwd,
     env: j.def.env,
@@ -42,14 +49,14 @@ export function listJobs(){
     timeoutSec: j.def.timeoutSec || 0,
     lastRun: j.lastRun || null,
     lastExit: j.lastExit ?? null,
-    nextRun: j.task ? j.task.getNextDates().toDate() : null,
+    nextRun: j.def.enabled && j.task ? j.task.getNextRun() : null,
   }));
 }
 
 export async function removeJob(id){
   const j = jobs.get(id);
   if (!j) return false;
-  if (j.task) try { j.task.stop(); } catch {}
+  if (j.task) try { j.task.destroy(); } catch {}
   jobs.delete(id);
   await persist();
   return true;
@@ -59,25 +66,26 @@ export async function toggleJob(id, enabled){
   const j = jobs.get(id);
   if (!j) return false;
   j.def.enabled = !!enabled;
-  if (enabled) {
-    if (!j.task) j.task = scheduleTask(j.def);
-    else j.task.start();
-  } else {
-    if (j.task) j.task.stop();
-  }
+  if (!j.task) j.task = scheduleTask(j.def);
+  else if (enabled) j.task.start();
+  else j.task.stop();
   await persist();
   return true;
 }
 
+// node-cron 4: createTask() builds the task stopped; start() only when enabled
 function scheduleTask(def){
-  const t = cron.schedule(def.cron, () => runNow(def.id), { scheduled: !!def.enabled, timezone: def.timezone || undefined });
+  const t = cron.createTask(def.cron, () => runNow(def.id), { name: def.id, timezone: def.timezone || undefined });
+  if (def.enabled) t.start();
   return t;
 }
 
 export async function createJob(def, persistAfter=true){
   if (!def || !def.id) throw new Error('def.id requerido');
+  if (!def.action && (!def.cmd || !String(def.cmd).trim())) throw new Error('El comando no puede estar vacío');
+  if (def.cron && !cron.validate(def.cron)) throw new Error(`Expresión cron no válida: ${def.cron}`);
   const existing = jobs.get(def.id);
-  if (existing && existing.task) existing.task.stop();
+  if (existing && existing.task) existing.task.destroy();
   const merged = existing ? { ...existing.def, ...def } : { ...def };
   const job = {
     def: {
@@ -85,6 +93,8 @@ export async function createJob(def, persistAfter=true){
       name: merged.name || merged.id,
       cron: merged.cron || '* * * * *',
       cmd: merged.cmd || '',
+      action: merged.action || undefined,
+      actionArgs: merged.actionArgs || undefined,
       args: Array.isArray(merged.args) ? merged.args : (merged.args ? String(merged.args).split(' ') : []),
       cwd: merged.cwd || undefined,
       env: merged.env || {},
@@ -94,8 +104,8 @@ export async function createJob(def, persistAfter=true){
       timezone: merged.timezone || undefined,
     },
     task: null,
-    lastRun: null,
-    lastExit: null,
+    lastRun: existing?.lastRun || null,
+    lastExit: existing?.lastExit ?? null,
     logs: existing?.logs || [],
   };
   job.task = scheduleTask(job.def);
@@ -117,6 +127,18 @@ async function doSpawn(job){
   const def = job.def;
   job.lastRun = nowIso();
   const start = Date.now();
+  if (def.action) {
+    const action = actions.get(def.action);
+    let code = 0, out = '', err = '';
+    try {
+      if (!action) throw new Error(`Acción desconocida: ${def.action}`);
+      out = String(await action.run(def.actionArgs || {}) ?? '');
+    } catch (e) { code = 1; err = String(e?.message || e); }
+    job.lastExit = code;
+    job.logs.push({ ts: nowIso(), durationMs: Date.now()-start, code, out, err, killedByTimeout: false });
+    job.logs = job.logs.slice(-100);
+    return;
+  }
   const child = spawn(def.cmd, def.args || [], {
     cwd: def.cwd || undefined,
     env: { ...process.env, ...(def.env || {}) },
@@ -128,6 +150,7 @@ async function doSpawn(job){
   const errChunks = [];
   let killedByTimeout = false;
   const killTimer = def.timeoutSec > 0 ? setTimeout(() => { try { killedByTimeout = true; child.kill('SIGTERM'); } catch {} }, def.timeoutSec*1000) : null;
+  child.on('error', (err) => errChunks.push(Buffer.from(String(err?.message || err))));
   child.stdout.on('data', d => chunks.push(d));
   child.stderr.on('data', d => errChunks.push(d));
   child.on('close', (code) => {

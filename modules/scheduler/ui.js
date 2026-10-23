@@ -5,85 +5,90 @@ export function mountSchedulerModule(root){
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <h2 class="title">Programador de tareas</h2>
-    <div class="row" style="margin-bottom:8px; align-items:center;">
-      <button id="btn-new" class="primary">Nueva tarea</button>
-      <div class="small muted" style="margin-left:8px;">En ejecución mientras la app esté abierta. Para ejecución sin app, usa destino Windows.</div>
+    <div class="actions" style="margin-top:0;">
+      <button id="btn-new" class="primary">+ Nueva tarea</button>
+      <div class="small">Las tareas «en la app» solo corren con la app abierta. Para que funcionen siempre, usa destino Windows.</div>
     </div>
 
-    <div id="wizard" class="card" style="display:none; gap:12px;">
-      <div class="row" style="gap:12px; flex-wrap:wrap;">
-        <div>
+    <div id="wizard" class="card" style="display:none;">
+      <h3 class="section-title">Nueva tarea</h3>
+      <div class="grid" style="grid-template-columns:220px minmax(0,1fr);">
+        <div class="field">
           <div class="label">Destino</div>
-          <div class="row" style="gap:8px;">
+          <div class="row" style="gap:16px; min-height:42px;">
             <label class="small"><input type="radio" name="w-target" value="app" checked /> En la app</label>
             <label class="small"><input type="radio" name="w-target" value="win" /> Windows</label>
           </div>
         </div>
-        <div style="flex:1; min-width:260px;">
+        <div class="field">
           <div class="label">Nombre</div>
           <input id="w-name" type="text" placeholder="Mi tarea" />
         </div>
       </div>
 
-      <div class="row" style="gap:12px; flex-wrap:wrap;">
-        <div>
-          <div class="label">Preset de programación</div>
+      <div class="grid" style="grid-template-columns:260px repeat(2, minmax(0,180px)); justify-content:start;">
+        <div class="field">
+          <div class="label">Cuándo</div>
           <select id="w-preset">
-            <option value="every">Cada X minutos/horas</option>
-            <option value="daily">Diario a HH:MM</option>
-            <option value="workdays">Laboral (L–V) a HH:MM</option>
-            <option value="weekend">Fin de semana a HH:MM</option>
-            <option value="monthly">Mensual (día N a HH:MM)</option>
+            <option value="every">Cada X minutos u horas</option>
+            <option value="daily">Todos los días</option>
+            <option value="workdays">Laborables (L–V)</option>
+            <option value="weekend">Fines de semana</option>
+            <option value="monthly">Una vez al mes</option>
           </select>
         </div>
-        <div>
+        <div class="field" id="f-every">
           <div class="label">Cada</div>
-          <div class="row" style="gap:8px;">
-            <input id="w-every-n" type="number" min="1" value="15" style="width:80px;" />
+          <div class="input-group">
+            <input id="w-every-n" type="number" min="1" value="15" style="max-width:80px;" />
             <select id="w-every-unit">
-              <option value="min">min</option>
+              <option value="min">minutos</option>
               <option value="hour">horas</option>
             </select>
           </div>
         </div>
-        <div>
-          <div class="label">Hora</div>
-          <input id="w-time" type="time" value="09:00" />
-        </div>
-        <div>
+        <div class="field" id="f-dom">
           <div class="label">Día del mes</div>
           <input id="w-dom" type="number" min="1" max="31" value="1" />
         </div>
+        <div class="field" id="f-time">
+          <div class="label">Hora</div>
+          <input id="w-time" type="time" value="09:00" />
+        </div>
       </div>
 
-      <div class="row" style="gap:12px; flex-wrap:wrap;">
-        <div style="flex:1; min-width:280px;">
-          <div class="label">Comando / aplicación</div>
-          <input id="w-cmd" type="text" placeholder="echo Hola" />
+      <div class="grid" style="grid-template-columns:minmax(0,1fr) 140px 140px;">
+        <div class="field">
+          <div class="label">Comando o aplicación</div>
+          <input id="w-cmd" type="text" placeholder="echo Hola" spellcheck="false" />
         </div>
-        <div>
+        <div class="field f-app-only">
           <div class="label">Timeout (s)</div>
           <input id="w-timeout" type="number" min="0" value="0" />
         </div>
-        <div>
+        <div class="field f-app-only">
           <div class="label">Jitter (s)</div>
           <input id="w-jitter" type="number" min="0" value="0" />
         </div>
       </div>
 
-      <div class="row" style="gap:8px;">
+      <div class="actions">
         <button id="w-create" class="primary">Crear tarea</button>
         <button id="w-cancel" class="ghost">Cancelar</button>
-        <div id="w-summary" class="small muted" style="margin-left:auto;"></div>
+        <div id="w-summary" class="value-badge push" style="font-weight:500;"></div>
       </div>
+      <div id="w-error" class="small warn" style="margin-top:8px;"></div>
     </div>
 
-    <div class="label" style="margin-top:12px;">Tareas (app)</div>
-    <div id="sj-list" class="card" style="background:#0a0a0a; border-radius:12px; padding:12px; max-height:320px; overflow:auto;"></div>
+    <div class="field">
+      <div class="label">Tareas en la app</div>
+      <div id="sj-list" class="well" style="max-height:340px;"></div>
+    </div>
 
-    <div class="label" style="margin-top:12px;">Tareas de Windows</div>
-    <div id="ws-table" class="card" style="background:#0a0a0a; border-radius:12px; padding:12px; max-height:320px; overflow:auto;"></div>
+    <div class="field">
+      <div class="label">Tareas de Windows <span style="color:var(--text-faint);">· carpeta raíz del Programador de tareas</span></div>
+      <div id="ws-table" class="well" style="max-height:340px;"><div class="empty">Cargando…</div></div>
+    </div>
   `;
   root.appendChild(card);
 
@@ -102,6 +107,7 @@ export function mountSchedulerModule(root){
   const wSummary = $('#w-summary', card);
   const wCreate = $('#w-create', card);
   const wCancel = $('#w-cancel', card);
+  const wError = $('#w-error', card);
   const wTarget = () => (card.querySelector('input[name="w-target"]:checked')?.value || 'app');
   const sjList = $('#sj-list', card);
   const wsTable = $('#ws-table', card);
@@ -121,24 +127,26 @@ export function mountSchedulerModule(root){
 
   function renderJobs(items){
     sjList.innerHTML = '';
-    if (!items || !items.length){ sjList.innerHTML = '<div class="small muted">Sin tareas.</div>'; return; }
+    if (!items || !items.length){ sjList.innerHTML = '<div class="empty">Sin tareas todavía.</div>'; return; }
     for (const j of items){
       const cardRow = document.createElement('div');
-      cardRow.className = 'card';
-      cardRow.style.marginBottom = '8px';
+      cardRow.className = 'list-row';
       const header = document.createElement('div');
-      header.className = 'row'; header.style.alignItems='center'; header.style.gap='8px';
+      header.className = 'row'; header.style.flex = '1';
       const title = document.createElement('div');
-      title.innerHTML = `<strong>${j.name}</strong> <span class="small muted">(${humanCron(j.cron)})</span>`;
+      const strong = document.createElement('strong'); strong.textContent = j.name;
+      const cronInfo = document.createElement('span'); cronInfo.className = 'small muted'; cronInfo.textContent = ` (${humanCron(j.cron)})`;
+      title.append(strong, cronInfo);
       const badges = document.createElement('div'); badges.className='row'; badges.style.gap='6px';
       const badgeNext = document.createElement('span'); badgeNext.className='value-badge'; badgeNext.textContent = j.nextRun ? new Date(j.nextRun).toLocaleString() : '—';
       const badgeLast = document.createElement('span'); badgeLast.className='value-badge'; badgeLast.textContent = j.lastRun ? new Date(j.lastRun).toLocaleString() : '—';
       const badgeExit = document.createElement('span'); badgeExit.className='value-badge'; badgeExit.textContent = `exit ${j.lastExit ?? '—'}`;
       badges.append(badgeNext, badgeLast, badgeExit);
-      const actions = document.createElement('div');
-      const btnRun = document.createElement('button'); btnRun.className='ghost'; btnRun.textContent='Ejecutar'; btnRun.onclick = async ()=>{ await window.ctk.scheduler.runNow(j.id); refresh(); };
-      const btnToggle = document.createElement('button'); btnToggle.className='ghost'; btnToggle.textContent = j.enabled ? 'Pausar' : 'Reanudar'; btnToggle.onclick = async ()=>{ await window.ctk.scheduler.toggle(j.id, !j.enabled); refresh(); };
-      const btnDel = document.createElement('button'); btnDel.className='ghost'; btnDel.textContent='Eliminar'; btnDel.onclick = async ()=>{ await window.ctk.scheduler.remove(j.id); refresh(); };
+      title.style.flex = '1';
+      const actions = document.createElement('div'); actions.className = 'actions'; actions.style.gap = '6px';
+      const btnRun = document.createElement('button'); btnRun.className='ghost sm'; btnRun.textContent='Ejecutar'; btnRun.onclick = async ()=>{ await window.ctk.scheduler.runNow(j.id); refresh(); };
+      const btnToggle = document.createElement('button'); btnToggle.className='ghost sm'; btnToggle.textContent = j.enabled ? 'Pausar' : 'Reanudar'; btnToggle.onclick = async ()=>{ await window.ctk.scheduler.toggle(j.id, !j.enabled); refresh(); };
+      const btnDel = document.createElement('button'); btnDel.className='danger sm'; btnDel.textContent='Eliminar'; btnDel.onclick = async ()=>{ await window.ctk.scheduler.remove(j.id); refresh(); };
       actions.append(btnRun, btnToggle, btnDel);
       header.append(title, badges, actions);
       cardRow.appendChild(header);
@@ -146,33 +154,30 @@ export function mountSchedulerModule(root){
     }
   }
 
-  function csvToTable(csv){
-    // muy básico: separar por comas respetando comillas dobles
-    const rows = csv.trim().split(/\r?\n/);
-    if (!rows.length) return document.createTextNode('Sin datos');
-    const table = document.createElement('table'); table.style.width='100%'; table.className='small';
-    const thead = document.createElement('thead'); const tbody = document.createElement('tbody');
-    const parse = (line) => {
-      const out=[]; let cur=''; let inQ=false;
-      for (let i=0;i<line.length;i++){
-        const ch=line[i];
-        if (ch==='"') { if (inQ && line[i+1]==='"'){ cur+='"'; i++; } else { inQ=!inQ; } }
-        else if (ch===',' && !inQ){ out.push(cur); cur=''; }
-        else cur+=ch;
-      }
-      out.push(cur); return out;
-    };
-    const headers = parse(rows[0]);
+  function renderWinTasks(tasks){
+    wsTable.innerHTML = '';
+    if (!tasks.length){ wsTable.innerHTML = '<div class="empty">Sin tareas propias.</div>'; return; }
+    const table = document.createElement('table'); table.className='data';
     const trh = document.createElement('tr');
-    headers.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; th.style.textAlign='left'; th.style.padding='4px 6px'; trh.appendChild(th); });
-    thead.appendChild(trh);
-    rows.slice(1).forEach(r=>{
-      const tds = parse(r);
-      const tr=document.createElement('tr');
-      tds.forEach((c,i)=>{ const td=document.createElement('td'); td.textContent=c; td.style.padding='4px 6px'; tr.appendChild(td); });
+    ['Nombre', 'Próxima ejecución', 'Estado', ''].forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+    const thead = document.createElement('thead'); thead.appendChild(trh);
+    const tbody = document.createElement('tbody');
+    for (const t of tasks){
+      const tr = document.createElement('tr');
+      [t.name, t.nextRun, t.status].forEach(c=>{ const td=document.createElement('td'); td.textContent=c; tr.appendChild(td); });
+      const tdAct = document.createElement('td'); tdAct.className = 'actions-cell';
+      const btnDel = document.createElement('button'); btnDel.className='danger sm'; btnDel.textContent='Eliminar';
+      btnDel.onclick = async ()=>{
+        if (!confirm(`¿Eliminar la tarea de Windows "${t.name}"?`)) return;
+        const r = await window.ctk.winsched.delete(t.name);
+        if (!r.ok) alert(r.error || 'No se pudo eliminar');
+        refresh();
+      };
+      tdAct.appendChild(btnDel); tr.appendChild(tdAct);
       tbody.appendChild(tr);
-    });
-    table.append(thead, tbody); return table;
+    }
+    table.append(thead, tbody);
+    wsTable.appendChild(table);
   }
   function updateSummary(){
     const p = wPreset.value;
@@ -183,9 +188,14 @@ export function mountSchedulerModule(root){
     if (p==='weekend') text = `Sáb–Dom a las ${wTime.value}`;
     if (p==='monthly') text = `Día ${wDom.value} a las ${wTime.value}`;
     wSummary.textContent = text;
+    // Only show the fields that apply to the chosen preset / target
+    card.querySelector('#f-every').hidden = p !== 'every';
+    card.querySelector('#f-time').hidden = p === 'every';
+    card.querySelector('#f-dom').hidden = p !== 'monthly';
+    card.querySelectorAll('.f-app-only').forEach(el => { el.hidden = wTarget() !== 'app'; });
   }
   ['change','input'].forEach(ev => {
-    [wPreset,wEveryN,wEveryUnit,wTime,wDom].forEach(el => el.addEventListener(ev, updateSummary));
+    [wPreset,wEveryN,wEveryUnit,wTime,wDom,...card.querySelectorAll('input[name="w-target"]')].forEach(el => el.addEventListener(ev, updateSummary));
   });
   updateSummary();
 
@@ -206,16 +216,17 @@ export function mountSchedulerModule(root){
 
   async function refresh(){
     const r = await window.ctk.scheduler.list();
-    if (r.ok) renderJobs(r.jobs);
+    if (r.ok) renderJobs(r.jobs); else sjList.textContent = r.error || 'Error listando tareas';
     const w = await window.ctk.winsched.list();
-    wsTable.innerHTML = '';
-    if (w.ok) wsTable.appendChild(csvToTable(w.raw)); else wsTable.textContent = w.error || 'Error listando tareas';
+    if (w.ok) renderWinTasks(w.tasks || []); else wsTable.textContent = w.error || 'Error listando tareas';
   }
 
-  btnNew.addEventListener('click', ()=>{ wizard.style.display = 'block'; });
+  btnNew.addEventListener('click', ()=>{ wizard.style.display = 'block'; wError.textContent = ''; });
   wCancel.addEventListener('click', ()=>{ wizard.style.display = 'none'; });
   wCreate.addEventListener('click', async ()=>{
     const target = wTarget();
+    wError.textContent = '';
+    if (!wCmd.value.trim()) { wError.textContent = 'Indica el comando a ejecutar.'; return; }
     if (target==='app'){
       const id = (wName.value.trim() || `job-${Date.now()}`).replace(/\s+/g,'-');
       const def = {
@@ -228,17 +239,19 @@ export function mountSchedulerModule(root){
         timeoutSec: parseInt(wTimeout.value||'0',10)||0,
       };
       const r = await window.ctk.scheduler.create(def);
-      if (r.ok) { wizard.style.display='none'; refresh(); }
+      if (r.ok) { wizard.style.display='none'; refresh(); } else wError.textContent = r.error || 'No se pudo crear la tarea';
     } else {
       // Windows
+      const n = Math.max(1, parseInt(wEveryN.value||'1',10));
       const schedule = (function(){
-        if (wPreset.value==='every') return { type:'MINUTE', every: (wEveryUnit.value==='min'? Math.max(1,parseInt(wEveryN.value||'1',10)) : Math.max(1,parseInt(wEveryN.value||'1',10))*60) };
-        if (wPreset.value==='daily') return { type:'DAILY' };
-        if (wPreset.value==='workdays' || wPreset.value==='weekend' || wPreset.value==='monthly') return { type:'DAILY' };
+        if (wPreset.value==='every') return wEveryUnit.value==='min' ? { type:'MINUTE', every:n } : { type:'HOURLY', every:n };
+        if (wPreset.value==='workdays') return { type:'WEEKLY', days:'workdays' };
+        if (wPreset.value==='weekend') return { type:'WEEKLY', days:'weekend' };
+        if (wPreset.value==='monthly') return { type:'MONTHLY', every: Math.min(31, Math.max(1, parseInt(wDom.value||'1',10))) };
         return { type:'DAILY' };
       })();
       const r = await window.ctk.winsched.create({ name: wName.value.trim() || `CTK-${Date.now()}`, cmd: wCmd.value.trim(), schedule, startTime: (wTime.value||'09:00') });
-      if (r.ok) { wizard.style.display='none'; refresh(); }
+      if (r.ok) { wizard.style.display='none'; refresh(); } else wError.textContent = r.error || 'No se pudo crear la tarea en Windows';
     }
   });
   refresh();

@@ -3,46 +3,47 @@ const $ = (sel, root=document) => root.querySelector(sel);
 export function mountMixedKeyModule(root) {
   root.innerHTML = `
   <div class="card">
-    <div class="row">
-      <div style="flex:2;">
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) 240px; align-items:start;">
+      <div class="field">
         <div class="label">Carpeta de tu librería</div>
-        <div class="row">
+        <div class="input-group">
           <input id="mk-folder" type="text" placeholder="Selecciona una carpeta con tu música" />
           <button id="mk-browse" class="ghost">Elegir carpeta…</button>
         </div>
-        <div class="small muted" style="margin-top:6px;">El escaneo incluye todas las subcarpetas.</div>
+        <div class="small" style="margin-top:6px;">El escaneo incluye todas las subcarpetas.</div>
       </div>
-      <div style="flex:1; min-width:220px;">
+      <div class="field">
         <div class="label">Tolerancia BPM (±)</div>
-        <div class="slider-row">
+        <div class="slider-row" style="min-height:40px;">
           <input id="mk-tol" type="range" value="3" min="0" max="10" step="1" />
           <span id="mk-tol-val" class="value-badge">3</span>
         </div>
       </div>
-      <div style="align-self:flex-end;">
-        <button id="mk-scan" class="primary">Escanear</button>
-      </div>
     </div>
+    <div class="actions">
+      <button id="mk-scan" class="primary">Escanear librería</button>
+      <div id="mk-status" class="status"></div>
+    </div>
+  </div>
 
-    <div class="row" style="margin-top:12px;">
-      <div style="flex:1;">
+  <div class="card">
+    <div class="grid grid-2">
+      <div class="field">
         <div class="label">Pista de referencia</div>
         <select id="mk-ref"></select>
       </div>
-      <div style="flex:1;">
+      <div class="field" style="position:relative;">
         <div class="label">Buscar (título o artista)</div>
         <input id="mk-filter" type="text" placeholder="Escribe para filtrar…" />
-        <div id="mk-suggest" class="card" style="position:absolute; display:none; max-height:220px; overflow:auto; margin-top:6px; z-index:10;"></div>
-      </div>
-      <div style="align-self:flex-end;">
-        <button id="mk-recomend" class="ghost">Ver compatibles</button>
+        <div id="mk-suggest" class="card" style="position:absolute; top:100%; left:0; right:0; display:none; max-height:240px; overflow:auto; margin-top:6px; z-index:10; padding:6px; background:#0d0d10;"></div>
       </div>
     </div>
-
-    <div id="mk-status" class="small" style="margin-top:8px;"></div>
+    <div class="actions">
+      <button id="mk-recomend" class="ghost">Ver compatibles</button>
+    </div>
   </div>
 
-  <div id="mk-results" style="margin-top:16px;"></div>
+  <div id="mk-results"></div>
   `;
 
   const folderInput = $('#mk-folder', root);
@@ -110,8 +111,7 @@ export function mountMixedKeyModule(root) {
     suggestBox.innerHTML = '';
     for (const t of items) {
       const row = document.createElement('div');
-      row.style.padding = '8px 10px';
-      row.style.cursor = 'pointer';
+      row.className = 'nav-item';
       row.textContent = `${t.title || 'Sin título'} ${t.artist ? ' - ' + t.artist : ''}`;
       row.onclick = () => {
         refSelect.value = t.file;
@@ -126,11 +126,13 @@ export function mountMixedKeyModule(root) {
   filterInput.addEventListener('input', () => {
     renderRefOptions(filterInput.value);
   });
-  document.addEventListener('click', (e) => {
+  const onDocClick = (e) => {
     if (!suggestBox.contains(e.target) && e.target !== filterInput) {
       suggestBox.style.display = 'none';
     }
-  });
+  };
+  document.addEventListener('click', onDocClick);
+  root._cleanup = () => document.removeEventListener('click', onDocClick);
 
   btnRecomend.addEventListener('click', async () => {
     const referenceFile = refSelect.value;
@@ -138,61 +140,46 @@ export function mountMixedKeyModule(root) {
     const bpmTolerance = Math.max(0, parseInt(tolInput.value || '3', 10));
     const r = await window.ctk.library.recommend({ tracks, referenceFile, bpmTolerance });
     if (!r.ok) { status.textContent = `Error: ${r.error}`; return; }
-    renderRecommendations(r.recommendations || [], referenceFile);
+    renderRecommendations(r.recommendations || []);
   });
 
-  function renderRecommendations(recs, referenceFile) {
+  function renderRecommendations(recs) {
     results.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+    results.appendChild(card);
     if (!recs.length) {
-      const empty = document.createElement('div');
-      empty.className = 'small muted';
-      empty.textContent = 'No se encontraron pistas compatibles con los criterios.';
-      results.appendChild(empty);
+      card.innerHTML = '<div class="empty">No se encontraron pistas compatibles con los criterios.</div>';
       return;
     }
-    const list = document.createElement('div');
-    list.style.display = 'grid';
-    list.style.gridTemplateColumns = '1fr 0.6fr 0.6fr 0.6fr auto';
-    list.style.gap = '8px';
-    list.style.alignItems = 'center';
+    const head = document.createElement('div');
+    head.className = 'row';
+    head.style.justifyContent = 'space-between';
+    head.innerHTML = '<h3 class="section-title">Pistas compatibles</h3><span class="small">Ordenadas por BPM más cercano</span>';
+    card.appendChild(head);
 
-    const header = document.createElement('div');
-    header.className = 'small muted';
-    header.style.gridColumn = '1 / -1';
-    header.textContent = 'Pistas compatibles (ordenadas por BPM más cercano)';
-    results.appendChild(header);
-
-    // headers
-    const hdrs = ['Título', 'Artista', 'BPM', 'Camelot', ''];
-    for (const h of hdrs) {
-      const el = document.createElement('div');
-      el.className = 'label';
-      el.textContent = h;
-      list.appendChild(el);
-    }
-
+    const table = document.createElement('table');
+    table.className = 'data';
+    table.innerHTML = '<thead><tr><th>Título</th><th>Artista</th><th>BPM</th><th>Camelot</th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
     for (const t of recs) {
-      const title = document.createElement('div');
-      title.textContent = t.title || '—';
-      const artist = document.createElement('div');
-      artist.textContent = t.artist || '—';
-      const bpm = document.createElement('div');
-      bpm.textContent = t.bpm != null ? String(t.bpm) : '—';
-      const key = document.createElement('div');
-      key.textContent = t.camelot || t.key || '—';
-      const actions = document.createElement('div');
+      const tr = document.createElement('tr');
+      for (const v of [t.title || '—', t.artist || '—', t.bpm != null ? String(t.bpm) : '—', t.camelot || t.key || '—']) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      }
+      const tdAct = document.createElement('td');
+      tdAct.className = 'actions-cell';
       const open = document.createElement('button');
-      open.className = 'ghost';
+      open.className = 'ghost sm';
       open.textContent = 'Mostrar';
       open.onclick = () => window.ctk.shell.showItemInFolder(t.file);
-      actions.appendChild(open);
-
-      list.appendChild(title);
-      list.appendChild(artist);
-      list.appendChild(bpm);
-      list.appendChild(key);
-      list.appendChild(actions);
+      tdAct.appendChild(open);
+      tr.appendChild(tdAct);
+      tbody.appendChild(tr);
     }
-    results.appendChild(list);
+    table.appendChild(tbody);
+    card.appendChild(table);
   }
 }

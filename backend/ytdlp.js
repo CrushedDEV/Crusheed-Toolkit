@@ -1,169 +1,188 @@
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
-import { existsSync, createWriteStream } from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import { spawn } from 'node:child_process';
 import https from 'node:https';
+import { which, getFfmpegPath } from './binaries.js';
 
 const BIN_DIR = path.join(os.homedir(), '.crushed-toolkit', 'bin');
 const YT_WIN_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
 const YT_NIX_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+const UPDATE_STAMP = path.join(BIN_DIR, '.last-update');
+const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// A real yt-dlp binary is well above this; anything smaller is a truncated/failed download
+const MIN_BINARY_SIZE = 1024 * 1024;
 
 function isWindows() { return process.platform === 'win32'; }
 
-async function ensureDir(dir) {
-  await fs.mkdir(dir, { recursive: true });
+function localBinaryPath() {
+  return path.join(BIN_DIR, isWindows() ? 'yt-dlp.exe' : 'yt-dlp');
 }
 
-function downloadFile(url, dest) {
+// Streams url to dest following redirects; rejects on non-200 (GitHub "latest" links redirect).
+function downloadFile(url, dest, redirects = 5) {
   return new Promise((resolve, reject) => {
-    const file = createWriteStream(dest);
-    https.get(url, (response) => {
-      if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        // Follow redirects
-        downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+    https.get(url, { headers: { 'User-Agent': 'crushed-toolkit' } }, (response) => {
+      const { statusCode, headers } = response;
+      if (statusCode >= 300 && statusCode < 400 && headers.location) {
+        response.resume();
+        if (redirects <= 0) return reject(new Error('Demasiadas redirecciones'));
+        downloadFile(new URL(headers.location, url).toString(), dest, redirects - 1).then(resolve, reject);
         return;
       }
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
+      if (statusCode !== 200) {
+        response.resume();
+        reject(new Error(`HTTP ${statusCode} al descargar yt-dlp`));
         return;
       }
+      const file = createWriteStream(dest);
       response.pipe(file);
       file.on('finish', () => file.close(() => resolve(dest)));
-    }).on('error', (err) => {
-      fs.unlink(dest).catch(() => {});
-      reject(err);
-    });
+      file.on('error', reject);
+      response.on('error', reject);
+    }).on('error', reject);
   });
 }
 
-function which(cmd) {
-  const SEP = isWindows() ? ';' : ':';
-  const exts = isWindows() ? (process.env.PATHEXT || '').split(';') : [''];
-  const paths = (process.env.PATH || '').split(SEP);
-  for (const p of paths) {
-    const fulls = exts.map((e) => path.join(p, cmd + e));
-    for (const full of fulls) {
-      if (existsSync(full)) return full;
-    }
-  }
-  return null;
+async function isUsableBinary(p) {
+  try { return (await fs.stat(p)).size >= MIN_BINARY_SIZE; } catch { return false; }
 }
 
+// Prefers our own managed copy (it can self-update); falls back to one in PATH if the download fails.
 export async function ensureYtDlp() {
-  // 1) If in PATH, use it
-  const inPath = which(isWindows() ? 'yt-dlp.exe' : 'yt-dlp');
-  if (inPath) return inPath;
+  const localPath = localBinaryPath();
+  if (await isUsableBinary(localPath)) return localPath;
 
-  // 2) Otherwise, ensure local binary exists
-  await ensureDir(BIN_DIR);
-  const localPath = path.join(BIN_DIR, isWindows() ? 'yt-dlp.exe' : 'yt-dlp');
-  if (!existsSync(localPath)) {
-    const url = isWindows() ? YT_WIN_URL : YT_NIX_URL;
-    await downloadFile(url, localPath);
-    if (!isWindows()) {
-      await fs.chmod(localPath, 0o755);
-    }
+  await fs.mkdir(BIN_DIR, { recursive: true });
+  const tmp = localPath + '.download';
+  try {
+    await downloadFile(isWindows() ? YT_WIN_URL : YT_NIX_URL, tmp);
+    if (!(await isUsableBinary(tmp))) throw new Error('Descarga de yt-dlp incompleta');
+    await fs.rename(tmp, localPath);
+    if (!isWindows()) await fs.chmod(localPath, 0o755);
+    await fs.writeFile(UPDATE_STAMP, new Date().toISOString());
+    return localPath;
+  } catch (err) {
+    await fs.unlink(tmp).catch(() => {});
+    const inPath = which(isWindows() ? 'yt-dlp.exe' : 'yt-dlp');
+    if (inPath) return inPath;
+    throw new Error(`No se pudo obtener yt-dlp: ${err?.message || err}`);
   }
-  return localPath;
 }
 
-export async function checkFfmpegAvailable() {
-  const ff = which('ffmpeg');
-  return Boolean(ff);
+// Runs `yt-dlp -U` on the managed copy at most once a day. YouTube breaks old versions often.
+export async function updateYtDlp(ytDlpPath, { force = false } = {}) {
+  if (path.dirname(ytDlpPath) !== BIN_DIR) return { updated: false, skipped: 'external' };
+  if (!force) {
+    try {
+      const last = new Date(await fs.readFile(UPDATE_STAMP, 'utf-8')).getTime();
+      if (Date.now() - last < UPDATE_INTERVAL_MS) return { updated: false, skipped: 'recent' };
+    } catch {}
+  }
+  const out = await new Promise((resolve, reject) => {
+    const child = spawn(ytDlpPath, ['-U'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let buf = '';
+    child.stdout.on('data', d => buf += d.toString());
+    child.stderr.on('data', d => buf += d.toString());
+    child.on('error', reject);
+    child.on('close', (code) => code === 0 ? resolve(buf) : reject(new Error(buf.trim() || `yt-dlp -U salió con código ${code}`)));
+  });
+  await fs.writeFile(UPDATE_STAMP, new Date().toISOString());
+  const m = out.match(/Updated yt-dlp to\s+\S*?([\d.]+)/i);
+  return { updated: Boolean(m), version: m ? m[1] : undefined };
 }
 
-export function downloadWithYtDlp({ ytDlpPath, url, format, outputDir, onProgress, onLog }) {
+const VIDEO_QUALITY = {
+  best: 'bv*+ba/b',
+  '2160': 'bv*[height<=2160]+ba/b[height<=2160]',
+  '1440': 'bv*[height<=1440]+ba/b[height<=1440]',
+  '1080': 'bv*[height<=1080]+ba/b[height<=1080]',
+  '720': 'bv*[height<=720]+ba/b[height<=720]',
+  '480': 'bv*[height<=480]+ba/b[height<=480]',
+};
+const AUDIO_QUALITY = { best: '0', '320': '320K', '192': '192K', '128': '128K' };
+
+export function downloadWithYtDlp({ ytDlpPath, url, format, quality = 'best', playlist = false, outputDir, job, onProgress, onLog }) {
   return new Promise((resolve, reject) => {
-    const outTemplate = path.join(outputDir, '%(title)s.%(ext)s');
+    const outTemplate = playlist
+      ? path.join(outputDir, '%(playlist_title|Playlist)s', '%(playlist_index|0)03d - %(title)s.%(ext)s')
+      : path.join(outputDir, '%(title)s.%(ext)s');
 
     const args = [
       url,
       '-o', outTemplate,
-      '--no-playlist',
+      playlist ? '--yes-playlist' : '--no-playlist',
       '--newline',
       '--no-color',
+      '--no-mtime',
       '--progress',
-      '--progress-template', '[download] %(progress._percent_str)s',
-      '--print', 'after_move:%(filepath)s'
+      '--progress-template', '[download] %(progress._percent_str)s at %(progress._speed_str)s ETA %(progress._eta_str)s',
+      '--print', 'after_move:filepath'
     ];
+    if (playlist) args.push('--ignore-errors');
+
+    const ffmpeg = getFfmpegPath();
+    if (ffmpeg) args.push('--ffmpeg-location', ffmpeg);
 
     if (format === 'mp3') {
-      args.push('--extract-audio', '--audio-format', 'mp3');
+      args.push('--extract-audio', '--audio-format', 'mp3', '--audio-quality', AUDIO_QUALITY[quality] || '0', '--embed-thumbnail', '--embed-metadata');
     } else {
-      // mp4 bestvideo+audio merged
-      args.push('-f', 'bv*+ba/best', '--merge-output-format', 'mp4');
+      args.push('-f', VIDEO_QUALITY[quality] || VIDEO_QUALITY.best, '--merge-output-format', 'mp4');
     }
 
-    const child = spawn(ytDlpPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-
-    let lastOutputFile = null;
-
-    child.stdout.on('data', (chunk) => {
-      const text = chunk.toString();
-      const lines = text.replace(/\r/g, '\n').split(/\n/);
-      for (const line of lines) {
-        if (!line) continue;
-        if (onLog) onLog({ stream: 'stdout', line });
-        // Capture explicit printed final path
-        // If yt-dlp printed the final filepath, prefer it
-        if (!lastOutputFile) {
-          const winAbs = /^[a-zA-Z]:\\/;
-          const nixAbs = /^\//;
-          if (winAbs.test(line) || nixAbs.test(line)) {
-            lastOutputFile = line.trim();
-          }
-        }
-        // Progress lines like: [download]  12.3% ...
-        let m = line.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/);
-        if (!m) m = line.match(/((?:\d+[\.,]\d+)|\d+)%/);
-        if (m && onProgress) {
-          const percent = parseFloat(String(m[1]).replace(',', '.'));
-          // Try to capture speed and ETA from the same line
-          const speedMatch = line.match(/\bat\s+([\d\.]+\w+\/s)\b/i);
-          const etaMatch = line.match(/ETA\s+([0-9:]+)/i);
-          onProgress({ percent, stage: 'download', speed: speedMatch ? speedMatch[1] : undefined, eta: etaMatch ? etaMatch[1] : undefined });
-        }
-        // Post-processing cues
-        if (onProgress) {
-          if (/\[ExtractAudio\]/.test(line)) onProgress({ stage: 'postprocess', step: 'extract-audio' });
-          if (/\[Merger\]/.test(line)) onProgress({ stage: 'postprocess', step: 'merge' });
-        }
-        // Fallback parsing for output path lines
-        if (!lastOutputFile) {
-          const f1 = line.match(/Destination:\s(.+)/);
-          const f2 = line.match(/\[Merger\].+Merging formats into\s\"(.+)\"/);
-          const candidate = (f1 && f1[1]) || (f2 && f2[1]);
-          if (candidate) lastOutputFile = candidate;
-        }
-      }
+    // Force UTF-8 output so titles with accents produce a correct file path
+    const child = spawn(ytDlpPath, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
     });
+    if (job) job.child = child;
 
+    const outputFiles = [];
     let errBuf = '';
-    child.stderr.on('data', (chunk) => {
-      errBuf += chunk.toString();
-      const text = chunk.toString().replace(/\r/g, '\n');
-      text.split(/\n/).forEach(l => { if (l && onLog) onLog({ stream: 'stderr', line: l }); });
-      let m = text.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/);
-      if (!m) m = text.match(/((?:\d+[\.,]\d+)|\d+)%/);
+
+    function handleLine(stream, line) {
+      if (!line) return;
+      if (onLog) onLog({ stream, line });
+      // after_move:filepath prints each final absolute path on its own line
+      if (stream === 'stdout' && (/^[a-zA-Z]:\\/.test(line) || /^\//.test(line))) {
+        outputFiles.push(line.trim());
+        if (onProgress) onProgress({ stage: 'done-item', file: line.trim(), count: outputFiles.length });
+        return;
+      }
+      const item = line.match(/Downloading item (\d+) of (\d+)/i);
+      if (item && onProgress) onProgress({ stage: 'item', index: +item[1], total: +item[2] });
+      const m = line.match(/\[download\]\s+((?:\d+[\.,]\d+)|\d+)%/);
       if (m && onProgress) {
         const percent = parseFloat(String(m[1]).replace(',', '.'));
-        const speedMatch = text.match(/\bat\s+([\d\.]+\w+\/s)\b/i);
-        const etaMatch = text.match(/ETA\s+([0-9:]+)/i);
-        onProgress({ percent, stage: 'download', speed: speedMatch ? speedMatch[1] : undefined, eta: etaMatch ? etaMatch[1] : undefined });
+        const speedMatch = line.match(/\bat\s+(\S+\/s)/i);
+        const etaMatch = line.match(/ETA\s+([0-9:]+)/i);
+        onProgress({ percent, stage: 'download', speed: speedMatch?.[1], eta: etaMatch?.[1] });
       }
       if (onProgress) {
-        if (/\[ExtractAudio\]/.test(text)) onProgress({ stage: 'postprocess', step: 'extract-audio' });
-        if (/\[Merger\]/.test(text)) onProgress({ stage: 'postprocess', step: 'merge' });
+        if (/\[ExtractAudio\]/.test(line)) onProgress({ stage: 'postprocess', step: 'extract-audio' });
+        if (/\[Merger\]/.test(line)) onProgress({ stage: 'postprocess', step: 'merge' });
       }
+    }
+
+    const splitLines = (chunk) => chunk.toString('utf-8').replace(/\r/g, '\n').split('\n');
+    child.stdout.on('data', (chunk) => splitLines(chunk).forEach(l => handleLine('stdout', l)));
+    child.stderr.on('data', (chunk) => {
+      errBuf += chunk.toString('utf-8');
+      splitLines(chunk).forEach(l => handleLine('stderr', l));
     });
 
     child.on('error', (err) => reject(err));
     child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ outputFile: lastOutputFile });
+      if (job) job.child = null;
+      if (job?.cancelled) return reject(Object.assign(new Error('Cancelado'), { cancelled: true }));
+      // With --ignore-errors a playlist can exit non-zero while still downloading most items
+      if (code === 0 || (playlist && outputFiles.length)) {
+        resolve({ outputFile: outputFiles[outputFiles.length - 1] || null, outputFiles });
       } else {
-        reject(new Error(errBuf || `yt-dlp exited with code ${code}`));
+        const errorLines = errBuf.split(/\r?\n/).filter(l => /^ERROR:/.test(l));
+        reject(new Error(errorLines.join('\n') || errBuf.trim() || `yt-dlp salió con código ${code}`));
       }
     });
   });

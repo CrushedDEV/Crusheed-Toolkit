@@ -1,7 +1,8 @@
 import { modules } from '../modules/index.js';
 
 const container = document.getElementById('module-container');
-let title = document.getElementById('module-title');
+const title = document.getElementById('module-title');
+const desc = document.getElementById('module-desc');
 const navButtons = Array.from(document.querySelectorAll('.nav-item'));
 const categories = Array.from(document.querySelectorAll('.category'));
 const catHeaders = Array.from(document.querySelectorAll('.cat-header'));
@@ -11,18 +12,17 @@ function setupUpdaterBanner() {
   if (!window.ctk || !window.ctk.updater) return;
   const bar = document.createElement('div');
   bar.id = 'update-bar';
-  bar.style.cssText = 'position:sticky;top:0;z-index:1000;background:#102a43;color:#e6f1ff;border-bottom:1px solid #0b2239;padding:8px 12px;display:none;align-items:center;gap:12px;';
   const msg = document.createElement('span');
   msg.className = 'small';
   const btn = document.createElement('button');
-  btn.className = 'primary';
+  btn.className = 'primary sm';
   btn.style.display = 'none';
   btn.textContent = 'Reiniciar y actualizar';
   btn.addEventListener('click', () => window.ctk.updater.quitAndInstall());
   bar.appendChild(msg);
   bar.appendChild(btn);
-  const content = document.querySelector('main.content') || document.body;
-  content.prepend(bar);
+  const topbar = document.querySelector('.topbar');
+  topbar.after(bar);
 
   const show = (text) => { bar.style.display = 'flex'; msg.textContent = text; };
   const hide = () => { bar.style.display = 'none'; btn.style.display = 'none'; };
@@ -42,17 +42,27 @@ function setupUpdaterBanner() {
 
   // Kick off a check (will be no-op in dev)
   try { window.ctk.updater.check(); } catch {}
+  return { show, hide };
 }
 
 // Initialize updater banner
-setupUpdaterBanner();
+const updateBanner = setupUpdaterBanner();
 
 const btnUpdate = document.getElementById('btn-update-check');
 if (btnUpdate && window.ctk && window.ctk.updater) {
-  btnUpdate.addEventListener('click', () => {
-    try { window.ctk.updater.check(); } catch {}
+  btnUpdate.addEventListener('click', async () => {
+    const r = await window.ctk.updater.check();
+    if (!r?.ok && updateBanner) {
+      updateBanner.show(r?.error || 'No se pudo buscar actualizaciones');
+      setTimeout(updateBanner.hide, 4000);
+    }
   });
 }
+
+window.ctk?.getDefaults().then(({ appVersion }) => {
+  const v = document.getElementById('app-version');
+  if (v && appVersion) v.textContent = `v${appVersion}`;
+}).catch(() => {});
 
 if (window.ctk && window.ctk.updater) {
   setInterval(() => {
@@ -99,10 +109,17 @@ function switchModule(key, params) {
     saveOpenCategories();
   }
   title.textContent = mod.title;
+  desc.textContent = mod.description || '';
   container.innerHTML = '';
-  mod.mount(container, params || {});
+  // Fresh host per mount: async work a module started keeps writing into its own (now detached) host
+  // instead of finding the next module's elements by id
+  const host = document.createElement('div');
+  host.className = 'module-host';
+  container.appendChild(host);
+  mod.mount(host, params || {});
+  for (const child of host.children) child.classList.add('module-enter');
   // capture cleanup provided by module
-  try { if (typeof container._cleanup === 'function') currentCleanup = container._cleanup; } catch {}
+  try { if (typeof host._cleanup === 'function') currentCleanup = host._cleanup; } catch {}
   try { localStorage.setItem(STORAGE_KEYS.lastModule, key); } catch {}
 }
 
